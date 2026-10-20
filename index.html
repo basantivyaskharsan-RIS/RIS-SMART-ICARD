@@ -641,8 +641,8 @@ function enterApp(){S.hold=false;L.mode='login';S.tab=tabsFor()[0][0];subAll();S
 function topLogout(){if(isAdmin()&&allStudents().length){choose('Would you like to back up your data before logging out?',[{t:'Back up and log out',f:async()=>{await doBackup(false);doLogout()}},{t:'Without backup',c:'sec',f:doLogout},{t:'Cancel',c:'sec'}])}else doLogout()}
 function doLogout(){try{if(FB)FB.auth.signOut()}catch(e){}S.isOwner=false;clearData();S.me=null;L.cat='';L.sid='';L.mode='login';S.ready=false;S.hold=false;renderAll(true);renderBars()}
 function renderTop(){const t=$('#topBtns');if(!t)return;if(!S.me){t.innerHTML='';return}
- t.innerHTML=`<span class="chip ok" title="${esc(S.me.name)}">${esc(S.me.name)} · ${esc(catLabel(S.me.cat))}</span><button id="tbPw" title="Change password">🔑</button><button id="tbOut" title="Log out">⎋<span class="lbl"> Log out</span></button>`;
- $('#tbPw').onclick=()=>viewChangePw(false);$('#tbOut').onclick=topLogout}
+ t.innerHTML=`<span class="chip ok" title="${esc(S.me.name)}">${esc(S.me.name)} · ${esc(catLabel(S.me.cat))}</span>${isAdmin()?'<button id="tbSet" title="Settings">⚙</button>':''}<button id="tbPw" title="Change password">🔑</button><button id="tbOut" title="Log out">⎋<span class="lbl"> Log out</span></button>`;
+ $('#tbPw').onclick=()=>viewChangePw(false);if($('#tbSet'))$('#tbSet').onclick=()=>{S.hold=false;S.tab='settings';renderAll(true)};$('#tbOut').onclick=topLogout}
 
 // ================= Student data writes =================
 const STX=['gender','cat2','mother','stopno','spec','sc','tmp','elder','pd','nobus'];
