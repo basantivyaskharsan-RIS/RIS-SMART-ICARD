@@ -1,6 +1,6 @@
 {
- "name": "RIS ID Card Maker",
- "short_name": "RIS Cards",
+ "name": "Radiant",
+ "short_name": "Radiant",
  "start_url": "./",
  "scope": "./",
  "display": "standalone",
