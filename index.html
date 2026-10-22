@@ -697,9 +697,9 @@ function navGroups(){const inb=Object.keys(S.suggest).length+Object.keys(S.flags
   Gp('classes','🏫','Classes',[L('classes','Classes')]),
   Gp('req','📨','Requests',[L('inbox','General',inb),L('vreq','Village',vq),L('idreq','ID card',iq)]),
   Gp('bus','🚌','Bus',[L('village','Village & stops'),L('routes','Routes'),L('bus','Timetable'),L('busrep','Bus report')]),
-  Gp('idc','🪪','ID Card',[L('design','Card design'),L('idreq','ID requests',iq),L('prn','Printed / Due'),L('staffid','Staff cards'),L('bulk','Bulk photos')]),
+  Gp('idc','🪪','ID Card',[L('design','Card design'),L('idreq','ID requests',iq),L('prn','Printed / Due'),L('due','Due entries',DUE.count()),L('staffid','Staff cards'),L('bulk','Bulk photos')]),
   Gp('more','☰','More',[L('rep','Reports'),L('staff','Staff'),L('settings','Settings')])];
- if(S.me&&S.me.cat==='teacher')return[Gp('students','🎓','My Class',[L('students','List'),L('phones','Phones')]),Gp('bus','🚌','Village & bus',[L('village','Village & bus')]),Gp('bulk','📷','Bulk Photos',[L('bulk','Bulk Photos')])];
+ if(S.me&&S.me.cat==='teacher')return[Gp('students','🎓','My Class',[L('students','List'),L('phones','Phones'),L('due','Due entries',DUE.count())]),Gp('bus','🚌','Village & bus',[L('village','Village & bus')]),Gp('bulk','📷','Bulk Photos',[L('bulk','Bulk Photos')])];
  const st=[L('students','List')];if(can('contact'))st.push(L('phones','Phones'));const G=[Gp('students','🎓','Students',st)];
  if(can('pdf'))G.push(Gp('classes','🏫','Classes',[L('classes','Classes')]));if(can('report'))G.push(Gp('rep','📊','Reports',[L('rep','Reports')]));if(can('bulk'))G.push(Gp('bulk','📷','Bulk Photos',[L('bulk','Bulk Photos')]));return G}
 function tabsFor(){const seen=new Set(),o=[];navGroups().forEach(g=>g.leaves.forEach(l=>{if(!seen.has(l.id)){seen.add(l.id);o.push([l.id,l.nm,l.n])}}));return o}
@@ -723,7 +723,7 @@ function renderAll(force){renderTop();
  showTabs();renderBars();const v=$('#view');const tab=S.tab;
  if(tab==='students'){if(!v.querySelector('#stuShell')||force)buildStudents();updateList();return}
  if(!force&&typing())return;
- ({classes:viewClasses,staff:()=>{SS.only=false;viewStaff()},staffid:()=>{SS.only=true;SS.sub='cards';viewStaff()},inbox:viewInbox,dups:viewDups,divide:viewDivide,rep:()=>{RP.only=false;viewReports()},busrep:()=>{RP.only=true;RP.sub='bus';viewReports()},prn:()=>{RP.only=true;RP.sub='prn';viewReports()},routes:viewRoutes,bulk:viewBulk,settings:viewSettings,phones:viewPhones,village:viewVillage,vreq:viewVreq,idreq:viewIdreq,gender:viewGender,design:viewDesign,bus:viewBus})[tab]();updBack()}
+ ({classes:viewClasses,staff:()=>{SS.only=false;viewStaff()},staffid:()=>{SS.only=true;SS.sub='cards';viewStaff()},inbox:viewInbox,dups:viewDups,divide:viewDivide,rep:()=>{RP.only=false;viewReports()},busrep:()=>{RP.only=true;RP.sub='bus';viewReports()},prn:()=>{RP.only=true;RP.sub='prn';viewReports()},routes:viewRoutes,bulk:viewBulk,settings:viewSettings,phones:viewPhones,village:viewVillage,vreq:viewVreq,idreq:viewIdreq,due:viewDue,gender:viewGender,design:viewDesign,bus:viewBus})[tab]();updBack()}
 
 // ================= Student list =================
 function flagOf(sid,kind){return Object.entries(S.flags).find(([id,f])=>f.sid===sid&&f.kind===kind&&f.by===S.me.id)}
@@ -774,7 +774,7 @@ function updateList(){const fc=$('#fc');if(!fc)return;const tch=!can('all');cons
   const dot=s._own&&s.seat&&s.seat!==s.cls?`<span class="pill dot">● Sits in ${esc(s.seat)} ➜</span>`:(!s._own?`<span class="pill dot">● ⬅ Actual class ${esc(s.cls)}</span>`:'');
   const pend=Object.values(S.flags).some(f=>f.sid===s.id&&f.by===me)||Object.values(S.suggest).some(f=>f.sid===s.id&&f.by===me);
   const ir=Object.values(S.idreq).some(f=>f.sid===s.id);
-  return `<div class="item ${s._own?'':'light'}" data-id="${esc(s.id)}"><div class="th">${t?`<img src="${t.d}">`:'No<br>photo'}</div><div class="grow"><div class="nm"><span class="sn">${sn}.</span> ${esc(s.name)}${pend?'<span class="pill y">⏳ Request sent</span>':''}${ir?'<span class="pill y">🪪 New card requested</span>':''}${s.hold?`<span class="pill y">${esc(reasonLabel(s.hold.r))}</span>`:''}${s.sc?'<span class="pill b">Staff child</span>':''}${dot}</div><div class="mt">${tch&&!showCls?'':'Class '+esc(s.cls)+' · '}Roll ${esc(s.roll||'-')} · ${esc(s.id)}${s.rte?'-R':''}${s.village?' · '+esc(vu(s.village)):''}${s.rte?' · <b class="ok">RTE</b>':''}${s.gender?' · '+(s.gender==='F'?'Girl':'Boy'):''}${s.tmp?` · Room ${esc(s.room||'-')} · Stop no. ${esc(s.stopno||'-')}`:''}${seatNote}</div></div><span style="display:flex;flex-direction:column;align-items:center;gap:6px;font-size:20px">${t?'✔':'📷'}${/^\d{10}$/.test(mob10(s.contact||s.contact2))?`<a class="callb" href="tel:+91${mob10(s.contact||s.contact2)}" onclick="event.stopPropagation()" title="Call">📞</a>`:''}</span></div>`};
+  return `<div class="item ${s._own?'':'light'}" data-id="${esc(s.id)}"><div class="th">${t?`<img src="${t.d}">`:'No<br>photo'}</div><div class="grow"><div class="nm"><span class="sn">${sn}.</span> ${esc(s.name)}${s.village?` <span class="muted small">· ${esc(vu(s.village))}</span>`:''}${pend?'<span class="pill y">⏳ Request sent</span>':''}${ir?'<span class="pill y">🪪 New card requested</span>':''}${s.hold?`<span class="pill y">${esc(reasonLabel(s.hold.r))}</span>`:''}${s.sc?'<span class="pill b">Staff child</span>':''}${dot}</div><div class="mt">${tch&&!showCls?'':'Class '+esc(s.cls)+' · '}Roll ${esc(s.roll||'-')} · ${esc(s.id)}${s.rte?'-R':''}${s.village?' · '+esc(vu(s.village)):''}${s.rte?' · <b class="ok">RTE</b>':''}${s.gender?' · '+(s.gender==='F'?'Girl':'Boy'):''}${s.tmp?` · Room ${esc(s.room||'-')} · Stop no. ${esc(s.stopno||'-')}`:''}${seatNote}</div></div><span style="display:flex;flex-direction:column;align-items:center;gap:6px;font-size:20px">${t?'':'📷'}${/^\d{10}$/.test(mob10(s.contact||s.contact2))?`<a class="callb" href="tel:+91${mob10(s.contact||s.contact2)}" onclick="event.stopPropagation()" title="Call">📞</a>`:''}</span></div>`};
  let shown=0,h='';
  if(FLATSORT.includes(S.sort)&&!S.fcls){const lbl={vil:'village',route:'bus route',sur:'surname',name:'name'}[S.sort];h+=`<div class="grp">All classes — sorted by ${lbl} (${a.length})</div>`;let sn=0;for(const s of a){if(shown>=S.more)break;shown++;h+=row(s,++sn,true)}}
  else{const AG=groupsOf(a),gl=Object.keys(AG).sort(cmpClass);
@@ -1414,6 +1414,41 @@ function viewGender(){const v=$('#view');GCK.compute();const L=GCK.list,all=allS
  v.querySelectorAll('[data-gc]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const it=L.find(x=>x.id===b.dataset.gc);await setGender([{id:it.id,g:it.sug}]);toast('Changed ✔');renderAll(true)}catch(e){b.disabled=false;toast(errMsg(e),6000)}});
  v.querySelectorAll('[data-gk]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await keepAdd([b.dataset.gk]);toast('Kept as saved.');renderAll(true)}catch(e){b.disabled=false;toast(errMsg(e),6000)}});
  if($('#gc_all'))$('#gc_all').onclick=()=>ask(`Change the gender of all ${L.length} children as suggested?`,async()=>{busy('Saving…');try{await setGender(L.map(it=>({id:it.id,g:it.sug})));unbusy();toast('Done ✔');renderAll(true)}catch(e){unbusy();toast(errMsg(e),6000)}},'Change all')}
+// ================= Due ID card entries =================
+const DUE={cls:'',ed:{}};
+DUE.fields=cls=>{const d=designFor(cls),on=new Set(d.rows.filter(r=>r.on).map(r=>r.k)),o=[];
+ if(on.has('rollid')&&d.rows.find(r=>r.k==='rollid').roll)o.push('roll');if(on.has('sr'))o.push('sr');if(on.has('father'))o.push('father');if(on.has('mother'))o.push('mother');if(on.has('contact'))o.push('contact');if(on.has('village'))o.push('village');if(on.has('special'))o.push('spec');if(on.has('route1'))o.push('route1');return o};
+DUE.pend=(sid,k)=>Object.values(S.suggest).some(f=>f.sid===sid&&f.fields&&f.fields[k]!==undefined)||(k==='village'&&Object.values(S.vreq).some(f=>f.sid===sid));
+DUE.miss=s=>{const m=[];if(!hasThumb(s.id))m.push('photo');DUE.fields(s.cls).forEach(k=>{let e=false;if(k==='contact')e=!/^\d{10}$/.test(mob10(s.contact||s.contact2));else if(k==='route1')e=!s.nobus&&!String(s.route1||'').trim();else if(k==='village')e=!vu(s.village);else e=!String(s[k]||'').trim();if(e&&!DUE.pend(s.id,k))m.push(k)});return m};
+DUE.scope=()=>allStudents().filter(s=>canTouch(s)&&!(s.seat&&!can('all')&&false));
+DUE.list=()=>{const o=[];DUE.scope().forEach(s=>{const m=DUE.miss(s);if(m.length)o.push({s,m})});return o};
+DUE.count=()=>{try{return S.tab&&S.me&&Object.keys(S.classes).length?DUE.list().length:0}catch(e){return 0}};
+const DUEL={photo:'Photo',roll:'Roll no.',sr:'SR No.',father:'Father name',mother:'Mother name',contact:'Mobile number',village:'Village',spec:'Special no.',route1:'Bus route'};
+function viewDue(){const v=$('#view'),all=DUE.list(),by={};all.forEach(x=>{const b=baseOf(x.s.cls);(by[b]=by[b]||{n:0,sec:{}}).n++;const sc=x.s.cls;by[b].sec[sc]=(by[b].sec[sc]||0)+1});
+ const cls=Object.keys(by).sort(cmpClass);if(DUE.cls&&!by[DUE.cls])DUE.cls='';
+ const cur=DUE.cls||'',rows=cur?all.filter(x=>baseOf(x.s.cls)===cur):all;
+ const sorted=rows.slice().sort((a,b)=>cmpClass(a.s.cls,b.s.cls)||((parseInt(a.s.roll,10)||9999)-(parseInt(b.s.roll,10)||9999))).slice(0,60);
+ const inp=(s,k)=>{const id=esc(s.id);if(k==='photo')return `<div class="row" style="margin-top:4px"><button class="btn sec sm" data-dp="${id}">📷 Photo</button></div>`;
+  return `<label class="f small">${DUEL[k]}</label><input type="${k==='contact'?'tel':'text'}" ${k==='contact'?'inputmode="numeric" maxlength="10"':''} data-df="${id}" data-k="${k}" value="">`};
+ v.innerHTML=`<h2>Due ID card entries (${all.length})</h2><p class="muted small">Only what is printed on the card front (and the photo) is asked here. When you tap Save, the child leaves this list.${can('edit')?'':' Corrections you save are sent to the admin.'}</p>
+<div class="box"><h3>School total: ${all.length} children</h3>${cls.length?`<div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn ${cur?'sec':''} sm" data-dc="">All (${all.length})</button>${cls.map(c=>`<button class="btn ${cur===c?'':'sec'} sm" data-dc="${esc(c)}">${esc(c)} (${by[c].n})</button>`).join('')}</div>${cur?`<p class="small muted" style="margin:8px 0 0">Class ${esc(cur)}: ${Object.entries(by[cur].sec).sort((a,b)=>cmpClass(a[0],b[0])).map(([k,n])=>esc(k)+' = <b>'+n+'</b>').join(' · ')}</p>`:''}`:'<p class="ok">Nothing is due 🎉</p>'}</div>
+<div class="box">${sorted.map(({s,m})=>`<div style="padding:10px 0;border-bottom:1px solid var(--line)" data-dr="${esc(s.id)}"><b>${esc(s.name)}</b> <span class="muted small">· ${esc(s.cls)} · Roll ${esc(s.roll||'-')}</span><div class="small bad">Missing: ${m.map(k=>DUEL[k]).join(', ')}</div>${m.map(k=>inp(s,k)).join('')}<div class="row" style="margin-top:8px"><button class="btn sm" data-ds="${esc(s.id)}">Save</button></div></div>`).join('')}${rows.length>60?`<p class="muted small">Showing 60 of ${rows.length}. The rest appear as you save.</p>`:''}</div>`;
+ v.querySelectorAll('[data-dc]').forEach(b=>b.onclick=()=>{DUE.cls=b.dataset.dc;viewDue()});
+ v.querySelectorAll('[data-dp]').forEach(b=>b.onclick=()=>openStudent(b.dataset.dp));
+ v.querySelectorAll('[data-ds]').forEach(b=>b.onclick=()=>saveDue(b.dataset.ds))}
+async function saveDue(id){const s=allStudents().find(x=>x.id===id);if(!s)return;const box=document.querySelector(`[data-dr="${CSS.escape(id)}"]`),f={};
+ box.querySelectorAll('[data-df]').forEach(i=>{const v=i.value.trim();if(v)f[i.dataset.k]=v});
+ if(!Object.keys(f).length)return toast('Fill in at least one box.',3500);
+ if(f.contact){f.contact=mob10(f.contact);if(f.contact.length!==10)return toast('The number must have 10 digits.',4500)}
+ if(f.route1)f.route1=f.route1.trim();
+ try{const rest={};
+  if(f.contact){const d={f:f.contact,m:(S.contacts[id]||{}).m!==undefined?S.contacts[id].m:(s.contact2||''),by:S.me.id,at:Date.now()};await save(()=>S.db.doc('contacts/'+id).set(d));S.contacts[id]=d;delete f.contact}
+  if(f.village){const V=vu(f.village);delete f.village;await setVillageFor(s,V)}
+  ['roll','sr','father','mother','spec','route1'].forEach(k=>{if(f[k]!==undefined)rest[k]=(k==='father'||k==='mother')?tc(f[k]):f[k]});
+  if(Object.keys(rest).length){if(can('edit')){const n=Object.assign({},s,rest);if(rest.roll&&allStudents().some(x=>x.id!==id&&x.cls===n.cls&&x.roll===rest.roll))return toast('This roll number is already used in the class.',5000);await saveStudent(n,s)}else await sendSuggest2(s,rest)}
+  logHist('due',s,'ID card entries filled');toast('Saved ✔ '+s.name,2500);const y=window.scrollY;renderAll(true);window.scrollTo(0,y)}catch(e){toast(errMsg(e),6000)}}
+async function sendSuggest2(st,fields){const id='s_'+Date.now().toString(36)+rnd(3,'abcdefghjkmnpqrstuvwxyz'),d={kind:'edit',sid:st.id,sname:st.name,cls:st.cls,fields,by:S.me.id,byName:S.me.name,at:Date.now()};await enqueue(()=>S.db.doc('suggest/'+id).set(d));S.suggest[id]=d;bump('sugg')}
+
 // ================= Duplicate check (never by name alone) =================
 const DP={res:{red:[],yellow:[],sibs:[]},plan:{},sub:'',count:0,dirty:true};
 const nrm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9ऀ-ॿ]/g,'');
