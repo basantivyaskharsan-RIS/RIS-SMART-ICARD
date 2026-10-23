@@ -1547,21 +1547,149 @@ function repDash(){const b=$('#rpBody'),all=allStudents(),left=allStudents(true)
  const G=gt.reduce((a,x)=>a.map((y,i)=>y+x[i]),[0,0,0]);
  b.innerHTML=`<div class="box"><h3>School grand total: ${G[0]}</h3><p class="small muted" style="margin:0">Boys ${G[1]} · Girls ${G[2]} · Left students (not counted): ${left.length}</p>${[0,1,2].map(g=>`<div class="small">${GN[g]}: <b>${gt[g][0]}</b></div>`).join('')}</div>${html}<p class="muted small">Tap a section to open its list.</p>`;
  b.querySelectorAll('[data-dg]').forEach(x=>x.onclick=()=>{S.fcls=x.dataset.dg;go('students')})}
-// ---- Global search
-function globalSearch(){const d=$('#dlg');d.hidden=false;d.innerHTML=`<div><input type="search" id="gs_q" placeholder="Search anything — student, ID, mobile, class, route, tab…" autocomplete="off"><div id="gs_r" style="max-height:55vh;overflow:auto;margin-top:8px"></div><div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn sec" id="gs_x">Close</button></div></div>`;
+// ---- Ask box: understands short Hindi / English / Hinglish questions and instructions (no AI, fixed rules)
+const CMD={};
+CMD.ORD={'पहली':'1','पहला':'1','दूसरी':'2','दूसरा':'2','तीसरी':'3','तीसरा':'3','चौथी':'4','चौथा':'4','पाँचवीं':'5','पांचवी':'5','पांचवीं':'5','पाँचवी':'5','छठी':'6','छठवीं':'6','सातवीं':'7','सातवी':'7','आठवीं':'8','आठवी':'8','नौवीं':'9','नवमी':'9','नौवी':'9','दसवीं':'10','दसवी':'10'};
+CMD.dev2lat=s=>{const C={'क':'k','ख':'kh','ग':'g','घ':'gh','च':'ch','छ':'chh','ज':'j','झ':'jh','ट':'t','ठ':'th','ड':'d','ढ':'dh','ण':'n','त':'t','थ':'th','द':'d','ध':'dh','न':'n','प':'p','फ':'f','ब':'b','भ':'bh','म':'m','य':'y','र':'r','ल':'l','व':'v','श':'sh','ष':'sh','स':'s','ह':'h','ळ':'l','ड़':'r','ढ़':'rh','ज़':'j','फ़':'f','क़':'k','ख़':'kh','ग़':'g'},V={'अ':'a','आ':'aa','इ':'i','ई':'ee','उ':'u','ऊ':'oo','ए':'e','ऐ':'ai','ओ':'o','औ':'au','ऋ':'ri','ऑ':'o'},M={'ा':'aa','ि':'i','ी':'ee','ु':'u','ू':'oo','े':'e','ै':'ai','ो':'o','ौ':'au','ृ':'ri','ॉ':'o'};
+ s=String(s).normalize('NFC').replace(/\u0921\u093C/g,'\u0930').replace(/\u0922\u093C/g,'rh').replace(/\u093C/g,'').replace(/\u093E(?=\s|$)/g,'a');let o='';const a=[...s];for(let i=0;i<a.length;i++){const c=a[i],n=a[i+1];if(C[c]){o+=C[c];if(n&&M[n]){o+=M[n];i++}else if(n==='्'){i++}else if(n&&(C[n]||V[n])||n==='ं'||n==='ँ'){o+='a'}else if(n&&/[ \t]/.test(n)===false&&n!==undefined&&n!=='ः'){o+='a'}else{/* word end: no schwa */}}else if(V[c])o+=V[c];else if(c==='ं'||c==='ँ')o+='n';else if(c==='ः')o+='h';else if(M[c])o+=M[c];else o+=c}return o.replace(/aa(?=\s|$)/g,'a')};
+CMD.skel=s=>{s=String(s).toLowerCase().replace(/[^a-z]/g,'');s=s.replace(/ph/g,'f').replace(/w/g,'v').replace(/z/g,'j').replace(/q/g,'k').replace(/x/g,'ks').replace(/ck/g,'k').replace(/sh|ś/g,'s').replace(/ch+/g,'c').replace(/th/g,'t').replace(/dh/g,'d').replace(/kh/g,'k').replace(/gh/g,'g').replace(/bh/g,'b').replace(/jh/g,'j').replace(/(.)\1+/g,'$1');const f=s[0]||'';return(/[aeiou]/.test(f)?'a':f)+s.slice(1).replace(/[aeiouy]/g,'')};
+CMD.tokMatch=(q,t)=>{if(!q||!t)return false;const a=nrm(q),b=nrm(t);if(a===b)return true;if(a.length>=3&&b.startsWith(a))return true;const x=CMD.skel(q),y=CMD.skel(t);if(x.length>=2&&x===y)return true;return x.length>=4&&y.length>=4&&lev(x,y)<=1};
+CMD.STOP=new Set(('का की के को में से है हैं क्या कौन कहाँ कहां दो दीजिए दीजिये कर करो करना बताओ बताइए बताइये दिखाओ दिखाइए सभी सब वाले वाली वाला और या भी ही पर यह वह इस उस the of is are in for me my to show all list give tell what who where how many much ka ki ke ko mein me se hai hain kya kaun kitne kitni kitna batao dikhao karo kar do aur ya bhi par ye wo class क्लास कक्षा number नंबर नम्बर mobile मोबाइल फोन फोन phone contact father पिता पापा mother माता मम्मी village गाँव गांव roll रोल sr route रूट root stop स्टॉप stand student students बच्चे बच्चा बच्चों बच्ची बच्चियाँ विद्यार्थी child children teacher टीचर शिक्षक gender जेंडर lडका').split(/\s+/));
+CMD.parse=function(raw){const q0=nd(String(raw||'')).trim();if(!q0)return null;let t=' '+q0.normalize('NFC').replace(/\u093C/g,'').toLowerCase().replace(/[?!,.;:।]/g,' ').replace(/\s+/g,' ')+' ';
+ const P={raw:q0,t};const has=re=>re.test(t);
+ P.help=has(/ help | मदद | क्या पूछ| कैसे पूछ|examples?|उदाहरण|kya puch/);
+ P.count=has(/कितने|कितनी|कितना|संख्या|गिनती|how many|count| kitne | kitni | total | कुल /);
+ P.show=has(/दिखाओ|दिखाइए|दिखाइये|सूची|लिस्ट| list | show |खोलो|खोलिए| open |dikhao|batao|बताओ|बताइए/);
+ P.change=has(/करो|कर दो|कर दीजिए|कर दीजिये|बदलो|बदल दो|बदल दीजिए| set | change | update |लिखो|लिख दो|कर दें|karo| kar do|badlo/);
+ P.missing=has(/बिना|नहीं भरा|नही भरा|नहीं है|नही है|खाली|अधूरा|अधूरी|बाकी|missing|without| no |नहीं लगा|नहीं हुआ|nahi|bina/);
+ P.boys=has(/लडके|लडके|बालक|लडका|boys?| ladke| ladka/);P.girls=has(/लडक[िी]|बालिका|girls?|ladki/);
+ P.rte=has(/rte|आरटीई|आर टी ई/);P.nonrte=has(/non.?rte|गैर.?rte|नॉन.?rte/);
+ const CT=[['GENERAL',/general|जनरल|सामान्य/],['OBC',/ obc |ओबीसी|ओ बी सी/],['SC',/ sc |एससी|ए एस सी/],['ST',/ st |एसटी/],['SBC',/ sbc |एसबीसी/]];P.cat='';CT.forEach(([k,re])=>{if(!P.cat&&re.test(t))P.cat=k});
+ // class
+ let cls=null;const SEC=s=>({'ए':'A','बी':'B','सी':'C','डी':'D'}[s]||String(s).toUpperCase());
+ const named=[['Play Group',/play ?group|प्ले ?ग्रुप/],['Nursery',/nursery|नर्सरी/],['Jr. KG',/jr\.? ?kg|junior ?kg|जूनियर ?के ?जी|जूनियर ?केजी|ज्यूनियर|lkg|एलकेजी/],['Sr. KG',/sr\.? ?kg|senior ?kg|सीनियर ?के ?जी|सीनियर ?केजी|ukg|यूकेजी/]];
+ for(const [n,re] of named){const m=t.match(re);if(m){const after=t.slice(m.index+m[0].length).match(/^\s*[-–]?\s*(?:section |सेक्शन )?([a-dA-D]|ए|बी|सी|डी)(?=\s)/);cls={base:n,sec:after?SEC(after[1]):''};break}}
+ if(!cls){let m=t.match(/(?:class|क्लास|कक्षा|std)?\s*(\d{1,2})\s*(?:th|st|nd|rd|वीं|वी)?\s*[-–]?\s*(?:section |सेक्शन )?([a-dA-D]|ए|बी|सी|डी)(?=\s)/);if(m&&+m[1]>=1&&+m[1]<=10)cls={base:String(+m[1]),sec:SEC(m[2])};
+  if(!cls){m=t.match(/(?:class|क्लास|कक्षा|std)\s*(\d{1,2})(?=\s)/);if(m&&+m[1]>=1&&+m[1]<=10)cls={base:String(+m[1]),sec:''}}
+  if(!cls){for(const k in CMD.ORD){const i=t.indexOf(' '+k);if(i>=0){const after=t.slice(i+k.length+1).match(/^\s*(?:section |सेक्शन )?([a-dA-D]|ए|बी|सी|डी)(?=\s)/);cls={base:CMD.ORD[k],sec:after?SEC(after[1]):''};break}}}}
+ P.cls=cls;
+ // route / stop
+ let m=t.match(/(?:रूट|route|root|रुट)\s*(?:no\.?|नंबर|नम्बर|number|संख्या)?\s*(\d{1,2})/);P.route=m?String(+m[1]):'';
+ m=t.match(/(?:स्टॉप|स्टाप|stop|stand|स्टैंड)\s*(?:no\.?|नंबर|नम्बर|number)?\s*(\d{1,2})/);P.stop=m?String(+m[1]):'';
+ m=t.match(/(?:roll|रोल)\s*(?:no\.?|नंबर|number)?\s*(\d{1,3})/);P.roll=m?m[1]:'';
+ m=t.match(/(?:attendance|उपस्थिति|हाजिरी|हाजिरी)\s*(?:no\.?|नंबर|number)?\s*(\d{1,3})/);P.att=m?m[1]:'';
+ m=t.match(/(?<!\d)(\d{10})(?!\d)/);P.phone=m?m[1]:'';
+ // fields asked
+ P.f={};[['mobile',/नंबर|नम्बर|मोबाइल|फोन|फोन|number|mobile|phone|contact|कॉल| call |whatsapp|व्हाट्सएप|व्हाट्सऐप|संपर्क/],['father',/पिता|पापा|father|बाप/],['mother',/माता|मम्मी|मां |माँ|mother/],['village',/गाँव|गांव|village|ग्राम/],['class',/क्लास|कक्षा|class/],['roll',/रोल|roll/],['sr',/ sr | एसआर|एस आर/],['att',/उपस्थिति|attendance/],['photo',/फोटो|फोटो|photo|फोटू/],['gender',/जेंडर|gender|लिंग/],['cat2',/category|कैटेगरी|श्रेणी|जाति/],['route1',/रूट|route|बस रूट/],['stopno',/स्टॉप|stop|स्टैंड/],['adm',/admission|एडमिशन|प्रवेश/],['landmark',/लैंडमार्क|landmark/]].forEach(([k,re])=>{if(re.test(t))P.f[k]=1});
+ // villages
+ const tl=CMD.dev2lat(q0.toLowerCase()),vl=villageList();P.village='';let best=0;
+ vl.forEach(v=>{const n=nrm(v);if(n.length<3)return;const ok=nrm(q0).includes(n)||nrm(tl).includes(n)||(CMD.skel(v).length>=3&&t.split(' ').some(w=>w.length>=3&&CMD.skel(CMD.dev2lat(w))===CMD.skel(v)));if(ok&&n.length>best){P.village=v;best=n.length}});
+ // staff words
+ P.teacher=has(/टीचर|शिक्षक|मैडम|teacher|क्लास ?टीचर/);P.driver=has(/ड्राइवर|driver|चालक/);P.staff=has(/स्टाफ|staff|कर्मचारी/);
+ P.bus=has(/बस नंबर|bus ?no|bus number|बस का नंबर|गाडी/);P.start=has(/कहाँ से|शुरू|start|शुरुआत/);P.stops=has(/स्टॉप कितने|कितने स्टॉप|stops|स्टॉप/)&&P.count;
+ P.left=has(/छोड|छोड|left|tc |टीसी|हट गए|हटे/);P.top=has(/सबसे (ज्यादा|ज्यादा|अधिक|कम)|most|maximum|minimum|least/);P.low=has(/सबसे कम|least|minimum/);
+ P.photoMiss=P.missing&&P.f.photo;P.noteacher=has(/टीचर नहीं|teacher nahi|बिना टीचर|without teacher/);
+ return P};
+// leftover words = student name
+CMD.nameTokens=function(P){const drop=new Set();const ent=[P.village&&nrm(P.village)];const words=P.t.trim().split(/\s+/);const out=[];if(P.change){for(let i=0;i<words.length-1;i++)if(/^(गाँव|गांव|village)$/.test(words[i])){words.splice(i+1,1);break}}words.forEach(w=>{const l=w.toLowerCase();if(CMD.STOP.has(l)||/^\d+$/.test(l)||l.length<2)return;if(CMD.ORD[l])return;if(/^(a|b|c|d|ए|बी|सी|डी|th|st|nd|rd|वीं)$/.test(l))return;
+  if(/^(लडके|लडकियाँ|लडकियां|लडकी|लडका|boys?|girls?|rte|obc|sc|st|sbc|general|जनरल|नर्सरी|nursery|सेक्शन|section|सभी|कुल|total|बिना|नहीं|नही|खाली|अधूरा|बाकी|missing|without|no|सबसे|ज्यादा|ज्यादा|कम|अधिक|छोड|left|tc|हैं|करो|दो|कर|बदलो|लिखो|set|change|update|गाँव|गांव|का|की|के|है|क्या|कितने|कितनी|बताओ|दिखाओ|open|खोलो|खोलिए|लिस्ट|list|सूची|show|help|मदद)$/i.test(l))return;
+  if(P.village&&(nrm(P.village).includes(nrm(l))||CMD.skel(CMD.dev2lat(l))===CMD.skel(P.village)||nrm(CMD.dev2lat(l))===nrm(P.village)))return;out.push(l)});return out};
+CMD.findStudents=function(P){const toks=CMD.nameTokens(P);if(!toks.length)return[];const lat=toks.map(w=>/[ऀ-ॿ]/.test(w)?CMD.dev2lat(w):w);const all=allStudents(true).filter(canTouch);const res=[];
+ all.forEach(s=>{const nt=String(s.name||'').split(/\s+/),ft=String(s.father||'').split(/\s+/);let sc=0,miss=0;lat.forEach((w,i)=>{const okN=nt.some(x=>CMD.tokMatch(w,x)||CMD.tokMatch(toks[i],x)),okF=ft.some(x=>CMD.tokMatch(w,x)||CMD.tokMatch(toks[i],x));if(okN)sc+=2;else if(okF)sc+=1;else miss++});if(!miss&&sc>0)res.push({s,sc})});
+ res.sort((a,b)=>b.sc-a.sc||String(a.s.name).localeCompare(b.s.name));return res.slice(0,12).map(x=>x.s)};
+CMD.filter=function(P,base){let L=(base||allStudents()).filter(canTouch);const c=P.cls;
+ if(c)L=L.filter(s=>c.sec?s.cls===c.base+' - '+c.sec||(s.cls===c.base&&!c.sec):baseOf(s.cls)===c.base);
+ if(P.village)L=L.filter(s=>vu(s.village)===vu(P.village));
+ if(P.route)L=L.filter(s=>!s.nobus&&routeNum(s.route1)===P.route);
+ if(P.stop)L=L.filter(s=>String(s.stopno||'').trim()===P.stop);
+ if(P.boys&&!P.girls)L=L.filter(s=>s.gender==='M');if(P.girls&&!P.boys)L=L.filter(s=>s.gender==='F');
+ if(P.rte&&!P.nonrte)L=L.filter(s=>!!s.rte);if(P.nonrte)L=L.filter(s=>!s.rte);
+ if(P.cat)L=L.filter(s=>s.cat2===P.cat);return L};
+CMD.hasFilter=P=>!!(P.cls||P.village||P.route||P.stop||(P.boys!==P.girls)||P.rte||P.nonrte||P.cat);
+CMD.desc=P=>{const a=[];if(P.cls)a.push('Class '+P.cls.base+(P.cls.sec?' - '+P.cls.sec:''));if(P.village)a.push('Village '+P.village);if(P.route)a.push('Route '+P.route);if(P.stop)a.push('Stop '+P.stop);if(P.boys&&!P.girls)a.push('Boys');if(P.girls&&!P.boys)a.push('Girls');if(P.rte&&!P.nonrte)a.push('RTE');if(P.nonrte)a.push('Non-RTE');if(P.cat)a.push(P.cat);return a.join(' · ')};
+CMD.EX=['6A के बच्चे दिखाओ','कुल बच्चे कितने हैं','नर्सरी में लडकियाँ कितनी','RTE के बच्चे 5 क्लास','मुंडेडा गाँव के बच्चे','रूट 3 में कितने बच्चे','रूट 3 स्टॉप 2 के बच्चे','आरव का नंबर','आरव के पिता का नाम','आरव का गाँव','बिना मोबाइल वाले बच्चे','बिना फोटो वाले बच्चे 6A','गाँव नहीं भरा 7 क्लास','OBC बच्चे कितने','सबसे ज्यादा बच्चे किस गाँव में','सबसे कम बच्चे किस क्लास में','रूट 3 का बस नंबर','रूट 3 कहाँ से शुरू होता है','रूट 3 में कितने स्टॉप','किस क्लास में टीचर नहीं','5A का क्लास टीचर कौन','ड्राइवर का नंबर','कितने बच्चे स्कूल छोड गए','आरव का गाँव मुंडेडा करो','आरव का नंबर 9876543210 करो','आरव का जेंडर लडकी करो','आरव का रोल 12 करो','आरव रूट 3 स्टॉप 2 करो','फोन खोलो','जेंडर लिस्ट खोलो','बैकअप'];
+CMD.TABS=[['phones',/फोन|phone|नंबर लिस्ट|number list|संपर्क सूची|contact list/],['gall',/जेंडर|gender|लिंग/],['cnts',/गिनती|counts|काउंट/],['rolls',/रोल|roll|उपस्थिति|attendance/],['due',/ड्यू|due|अधूरी|incomplete/],['village',/गाँव|गांव|village/],['vwise',/गाँव.?वार|village.?wise/],['routes',/रूट|routes/],['bus',/टाइम ?टेबल|timetable/],['busrep',/बस रिपोर्ट|bus report/],['staff',/स्टाफ|staff/],['dups',/डुप्लीकेट|duplicate|सिबलिंग|sibling/],['rep',/रिपोर्ट|report|डैशबोर्ड|dashboard/],['settings',/सेटिंग|settings|बैकअप|backup/],['design',/कार्ड डिजाइन|card design|डिजाइन/],['idreq',/आई ?कार्ड रिक्वेस्ट|id request/],['inbox',/रिक्वेस्ट|अनुरोध|request|inbox/],['classes',/क्लास लिस्ट|classes|प्रिंट|print/],['bulk',/बल्क|bulk|फोटो/],['students',/लिस्ट|सूची|list|बच्चे/]];
+function listDlg(title,L,note){const d=$('#dlg');d.hidden=false;const n=L.length;d.innerHTML=`<div><b>${esc(title)}</b><div class="small muted">${n} ${note||'children'}</div><div style="max-height:62vh;overflow:auto;margin-top:8px">${L.slice().sort((a,b)=>cmpClass(a.cls,b.cls)||String(a.name).localeCompare(b.name)).slice(0,150).map((s,i)=>`<div class="item" data-id="${esc(s.id)}" style="cursor:pointer"><div class="grow"><div class="nm"><span class="sn">${i+1}.</span> ${esc(s.name)}</div><div class="mt">Class ${esc(s.cls)} · Roll ${esc(s.roll||'-')}${s.father?' · Father: '+esc(s.father):''}${s.village?' · '+esc(vu(s.village)):''}${s.route1?' · '+esc(s.route1):''}${s.stopno?' · Stop '+esc(s.stopno):''}${s.contact||s.contact2?' · '+esc(s.contact||s.contact2):''}</div></div>${/^\d{10}$/.test(mob10(s.contact||s.contact2))?`<a class="callb" href="javascript:void(0)" onclick="event.stopPropagation();callPick('${esc(s.id)}')">📞</a>`:''}</div>`).join('')||'<p class="muted small">No child.</p>'}${n>150?`<p class="muted small">Showing 150 of ${n}.</p>`:''}</div><div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn sec" id="ld_x">Close</button><button class="btn sec" id="ld_e">⬇ Export</button></div></div>`;
+ $('#ld_x').onclick=unbusy;$('#ld_e').onclick=()=>{unbusy();exportTableDialog('List_'+title,[['List',['No.','Student','Class','Roll','Father','Village','Route','Mobile'],L.slice().sort((a,b)=>cmpClass(a.cls,b.cls)||String(a.name).localeCompare(b.name)).map((s,i)=>[i+1,s.name,s.cls,s.roll||'',s.father||'',vu(s.village),s.route1||'',s.contact||s.contact2||''])]])};
+ d.querySelectorAll('.item[data-id]').forEach(x=>x.onclick=()=>{unbusy();openStudent(x.dataset.id)})}
+CMD.card=function(s,P){const rows=[];const F=P.f,any=Object.keys(F).length;const add=(l,v)=>rows.push(`<tr><td class="muted">${l}</td><td><b>${esc(v||'—')}</b></td></tr>`);
+ const all=!any||F.class&&Object.keys(F).length===1;const w=k=>all||F[k];
+ add('Name',s.name);add('Class',s.cls);if(w('roll'))add('Roll no.',s.roll);if(w('att')&&s.att)add('Attendance no.',s.att);if(w('father'))add('Father',s.father);if(w('mother'))add('Mother',s.mother);
+ if(w('village'))add('Village',vu(s.village));if(w('route1')||w('stopno')||all)add('Bus',(s.nobus?'No bus':(s.route1||'—')+(s.stopno?' · Stop '+s.stopno:'')+(lmOf(s)?' · 📍 '+lmOf(s):'')));
+ if(w('sr'))add('SR no.',s.sr);if(w('gender'))add('Gender',s.gender==='F'?'Girl':s.gender==='M'?'Boy':'');if(w('cat2'))add('Category',s.cat2);if(w('adm'))add('Admission date',s.adm);add('ID',s.id+(s.rte?'-R':''));
+ const a=mob10(s.contact),b=mob10(s.contact2),ok=x=>/^\d{10}$/.test(x);
+ const ph=(w('mobile')||all)?`${ok(a)?`<div class="row" style="margin-top:6px"><span class="small grow">Father: <b>${a}</b></span>${callWa(a)}</div>`:''}${ok(b)?`<div class="row" style="margin-top:6px"><span class="small grow">Mother: <b>${b}</b></span>${callWa(b)}</div>`:''}${!ok(a)&&!ok(b)?'<div class="small bad" style="margin-top:6px">No mobile number saved.</div>':''}`:'';
+ return `<div class="box" style="margin:8px 0"><table class="t" style="width:100%">${rows.join('')}</table>${ph}<div class="row" style="margin-top:8px"><button class="btn sec sm" data-cardopen="${esc(s.id)}">Open full profile</button></div></div>`};
+CMD.run=function(raw){const P=CMD.parse(raw);const out={html:'',after:null};if(!P)return null;
+ const me=allStudents(true).filter(canTouch);
+ if(P.help){out.html=`<div class="box"><b>You can ask (Hindi / English / Hinglish):</b><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${CMD.EX.map(x=>`<button class="btn sec sm" data-ex="${esc(x)}">${esc(x)}</button>`).join('')}</div><p class="small muted" style="margin:8px 0 0">Tap an example to try it. Anything that changes data will first show what will change and wait for your "Yes".</p></div>`;return out}
+ // ---- change instructions
+ if(P.change){const cand=CMD.findStudents(P);if(cand.length){const s=cand[0];const ch=[];let V='';
+   if(P.f.village||P.village){V=P.village||'';if(!V){const m=P.raw.match(/(?:गाँव|गांव|village)\s*([^\s]+)/i);if(m)V=m[1];}V=vu(V?(/[ऀ-ॿ]/.test(V)?CMD.dev2lat(V):V):'');if(V)ch.push(['village',V])}
+   if(P.phone){const key=P.f.mother&&!P.f.father?'contact2':'contact';ch.push([key,P.phone])}
+   if(P.f.gender||P.girls||P.boys){const g=P.girls&&!P.boys?'F':P.boys&&!P.girls?'M':'';if(g)ch.push(['gender',g])}
+   if(P.roll)ch.push(['roll',P.roll]);if(P.att)ch.push(['att',P.att]);
+   if(P.route||P.stop){if(P.route)ch.push(['route',P.route]);if(P.stop)ch.push(['stopno',P.stop])}
+   if(!ch.length){out.html=`<div class="box"><b class="warn">What should be changed?</b><p class="small muted">Try: "${esc(s.name.split(' ')[0])} का गाँव मुंडेडा करो", "… का नंबर 9876543210 करो", "… का रोल 12 करो", "… रूट 3 स्टॉप 2 करो".</p></div>`;return out}
+   const lab={village:'Village',contact:'Father mobile',contact2:'Mother mobile',gender:'Gender',roll:'Roll no.',att:'Attendance no.',route:'Route',stopno:'Stop no.'};
+   const show=([k,v])=>`${lab[k]}: <b>${esc(k==='gender'?(v==='F'?'Girl':'Boy'):v)}</b>`;
+   const others=cand.length>1?`<p class="small muted">${cand.length-1} other children have a similar name: ${cand.slice(1,4).map(x=>esc(x.name)+' ('+esc(x.cls)+')').join(', ')}. If this is the wrong child, type more of the name.</p>`:'';
+   out.html=`<div class="box"><b>Please confirm</b><p class="small">${esc(s.name)} · Class ${esc(s.cls)}<br>${ch.map(show).join('<br>')}</p>${others}<div class="row"><button class="btn grow" id="cm_yes">Yes, do it</button></div></div>`;
+   out.after=()=>{$('#cm_yes').onclick=async()=>{$('#cm_yes').disabled=true;try{await CMD.apply(s,ch);$('#gs_a').innerHTML='<div class="box"><b class="ok">Done ✔</b></div>'}catch(e){$('#cm_yes').disabled=false;toast(errMsg(e),6000)}}};return out}}
+ // ---- tabs / bus / staff / special questions
+ if(P.noteacher){const cl=[...new Set(allStudents().map(s=>s.cls))].sort(cmpClass),trs=Object.values(S.staff).filter(x=>x.cat==='teacher');const no=cl.filter(c=>!trs.some(x=>(x.classes||[]).includes(c)));out.html=`<div class="box"><b>${no.length} class(es) without a class teacher</b><p class="small">${no.map(esc).join(', ')||'None — every class has a teacher.'}</p></div>`;return out}
+ if((P.teacher||P.driver||P.staff)&&!CMD.findStudents(P).length||(P.teacher&&P.cls)){const stf=Object.entries(S.staff);let L=stf;
+   if(P.teacher&&P.cls){const c=P.cls;L=stf.filter(([i,x])=>x.cat==='teacher'&&(x.classes||[]).some(k=>c.sec?k===c.base+' - '+c.sec:baseOf(k)===c.base))}
+   else if(P.driver)L=stf.filter(([i,x])=>/driver|ड्राइवर/i.test(x.desig||'')||x.cat==='driver');else if(P.teacher)L=stf.filter(([i,x])=>x.cat==='teacher'||/teacher/i.test(x.desig||''));
+   const toks=CMD.nameTokens(P).map(w=>/[ऀ-ॿ]/.test(w)?CMD.dev2lat(w):w);if(toks.length&&!P.cls)L=L.filter(([i,x])=>toks.every(w=>String(x.name).split(/\s+/).some(n=>CMD.tokMatch(w,n))));
+   if(P.count&&!toks.length){out.html=`<div class="box"><b>${L.length}</b> ${P.driver?'driver(s)':P.teacher?'teacher(s)':'staff'}</div>`;return out}
+   out.html=`<div class="box"><b>${L.length} found</b>${L.slice(0,30).map(([i,x])=>{const m=mob10(x.mobile);return `<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><div class="grow"><b>${esc(x.name)}</b><div class="small muted">${esc(x.desig||catLabel(x.cat))}${x.cat==='teacher'&&(x.classes||[]).length?' · Class '+esc(x.classes.join(', ')):''}${m?' · '+m:''}</div></div>${/^\d{10}$/.test(m)?callWa(m):''}</div>`}).join('')||'<p class="muted small">Nobody found.</p>'}</div>`;return out}
+ if(P.route&&(P.bus||P.start||P.stops)&&!P.stop){const B=busDoc(),R=((B.season==='summer'||B.season==='winter')?B[B.season]:(B.cust[B.season]||{})).routes||{},r=R[P.route],bus=B.buses[P.route];const kids=CMD.filter({route:P.route},allStudents()).length;
+   out.html=`<div class="box"><b>Route ${esc(P.route)}</b><p class="small">${bus?'Bus: <b>'+esc(bus)+'</b><br>':'Bus number not entered.<br>'}${r&&r.start?'Starts from: <b>'+esc(r.start)+'</b><br>':''}${r?'Stops: <b>'+(r.stops||[]).filter(s=>s.n).length+'</b> — '+(r.stops||[]).filter(s=>s.n).map((s,i)=>(i+1)+'. '+esc(s.n)).join(', ')+'<br>':'Not in the timetable yet.<br>'}Children: <b>${kids}</b></p></div>`;return out}
+ if(P.left&&!CMD.findStudents(P).length){const L=allStudents(true).filter(s=>s.left&&canTouch(s));out.html=`<div class="box"><b>${L.length}</b> children have left the school.${L.length?'<div class="row" style="margin-top:6px"><button class="btn sec sm" id="cm_l">Show list</button></div>':''}</div>`;out.after=()=>{if($('#cm_l'))$('#cm_l').onclick=()=>listDlg('Left students',L)};return out}
+ if(P.top&&(P.f.village||P.f.class||P.f.route1||/क्लास|class/.test(P.t)||/गाँव|village/.test(P.t)||/रूट|route/.test(P.t))){const by={};const key=P.f.village||/गाँव|village/.test(P.t)?s=>vu(s.village)||null:P.f.route1||/रूट|route/.test(P.t)?s=>(!s.nobus&&routeNum(s.route1))?'Route '+routeNum(s.route1):null:s=>s.cls;me.filter(s=>!s.left).forEach(s=>{const k=key(s);if(k)by[k]=(by[k]||0)+1});
+   const ks=Object.keys(by).sort((a,b)=>P.low?by[a]-by[b]:by[b]-by[a]).slice(0,5);out.html=`<div class="box"><b>${P.low?'Least':'Most'} children</b>${ks.map((k,i)=>`<div class="row" style="padding:4px 0"><span class="sn">${i+1}.</span><span class="grow">${esc(k)}</span><b>${by[k]}</b></div>`).join('')||'<p class="muted small">No data.</p>'}</div>`;return out}
+ // ---- student info
+ if(!P.change&&!CMD.hasFilter(P)||(P.f.mobile||P.f.father||P.f.mother||P.f.village||P.f.roll||P.f.sr||P.f.att||P.f.gender||P.f.cat2||P.f.route1||P.f.stopno||P.f.adm||P.f.landmark)&&!CMD.hasFilter(P)){const cand=CMD.findStudents(P);
+   if(cand.length===1||(cand.length>1&&cand.length<=3)){out.html=cand.map(s=>CMD.card(s,P)).join('');out.after=()=>document.querySelectorAll('[data-cardopen]').forEach(b=>b.onclick=()=>{unbusy();openStudent(b.dataset.cardopen)});return out}
+   if(cand.length>3){out.html=`<div class="box"><b>${cand.length}${cand.length===12?'+':''} children match. Type more of the name.</b>${cand.slice(0,8).map(s=>`<div class="item" data-pick="${esc(s.id)}" style="cursor:pointer"><div class="grow"><div class="nm">${esc(s.name)}</div><div class="mt">Class ${esc(s.cls)}${s.father?' · '+esc(s.father):''}${s.village?' · '+esc(vu(s.village)):''}</div></div></div>`).join('')}</div>`;out.after=()=>document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{unbusy();openStudent(b.dataset.pick)});return out}}
+ // ---- tab navigation
+ const tb=CMD.TABS.find(([id,re])=>re.test(P.t));if(!P.count&&!P.missing&&!CMD.hasFilter(P)&&tb&&tabsFor().some(x=>x[0]===tb[0])){out.html=`<div class="box"><b>Open this screen?</b><div class="row" style="margin-top:8px"><button class="btn" id="cm_t">${esc((tabsFor().find(x=>x[0]===tb[0])||[0,tb[0]])[1])}</button></div></div>`;out.after=()=>{$('#cm_t').onclick=()=>{unbusy();go(tb[0])}};return out}
+ // ---- missing / counts / lists
+ const MF={mobile:'contact',village:'village',photo:'photo',father:'father',mother:'mother',sr:'sr',roll:'roll',att:'att',gender:'gender',cat2:'cat2',route1:'route1',stopno:'stopno',adm:'adm'};
+ const mk=Object.keys(MF).filter(k=>P.f[k]);
+ if(P.missing&&(mk.length||CMD.hasFilter(P))){let L=CMD.filter(P,allStudents());const keys=mk.map(k=>MF[k]);const miss=s=>keys.length?keys.some(k=>DUE.emp(s,k)):DUE.miss(s,'').length>0;L=L.filter(miss);
+   const what=mk.length?mk.map(k=>DUEL[MF[k]]||k).join(' / '):'ID card entries';const dk=keys[0]||'';
+   out.html=`<div class="box"><b>${L.length}</b> children — missing: ${esc(what)}${CMD.hasFilter(P)?'<br><span class="small muted">'+esc(CMD.desc(P))+'</span>':''}<div class="row" style="margin-top:8px"><button class="btn sm" id="cm_f">Open and fill</button>${L.length?'<button class="btn sec sm" id="cm_l">Show list</button>':''}</div></div>`;
+   out.after=()=>{$('#cm_f').onclick=()=>{unbusy();DUE.only=dk;DUE.cls=P.cls?P.cls.base:'';go('due','idc')};if($('#cm_l'))$('#cm_l').onclick=()=>listDlg('Missing '+what,L)};return out}
+ if(P.count||P.show||CMD.hasFilter(P)||P.boys||P.girls){let L=CMD.filter(P,allStudents());
+   if(!CMD.hasFilter(P)&&P.count){const T=allStudents().filter(canTouch),b=T.filter(s=>s.gender==='M').length,g=T.filter(s=>s.gender==='F').length;out.html=`<div class="box"><b style="font-size:20px">${T.length}</b> children in school<p class="small" style="margin:4px 0 0">Boys ${b} · Girls ${g} · not set ${T.length-b-g}</p><div class="row" style="margin-top:8px"><button class="btn sec sm" id="cm_l">Show all</button></div></div>`;out.after=()=>{$('#cm_l').onclick=()=>listDlg('All children',T)};return out}
+   if(P.count&&!P.show){const b=L.filter(s=>s.gender==='M').length,g=L.filter(s=>s.gender==='F').length;out.html=`<div class="box"><b style="font-size:20px">${L.length}</b> children<div class="small muted">${esc(CMD.desc(P))}</div><p class="small" style="margin:4px 0 0">Boys ${b} · Girls ${g}</p><div class="row" style="margin-top:8px"><button class="btn sec sm" id="cm_l">Show list</button></div></div>`;out.after=()=>{$('#cm_l').onclick=()=>listDlg(CMD.desc(P),L)};return out}
+   if(CMD.hasFilter(P)||P.show){out.html=`<div class="box"><b>${L.length}</b> children<div class="small muted">${esc(CMD.desc(P))}</div><div class="row" style="margin-top:8px"><button class="btn sm" id="cm_l">Show list</button></div></div>`;out.after=()=>{$('#cm_l').onclick=()=>listDlg(CMD.desc(P)||'Children',L)};return out}}
+ return null};
+CMD.apply=async function(s,ch){const id=s.id,adm=can('edit');const get=k=>(ch.find(x=>x[0]===k)||[])[1];
+ const V=get('village');if(V){await setVillageFor(s,V)}
+ const c1=get('contact'),c2=get('contact2');if(c1||c2){if(!can('contact'))throw{message:'You are not allowed to change mobile numbers.'};const c=S.contacts[id]||{},d={f:c1||(c.f!==undefined?c.f:(s.contact||'')),m:c2||(c.m!==undefined?c.m:(s.contact2||'')),by:S.me.id,at:Date.now()};await save(()=>S.db.doc('contacts/'+id).set(d));S.contacts[id]=d;logHist('phones',s,'Mobile saved (ask box)');sibSync(id,Object.assign({},c1&&c1!==mob10(s.contact)?{contact:c1}:{},c2&&c2!==mob10(s.contact2)?{contact2:c2}:{}))}
+ const g=get('gender');if(g){if(adm)await setGender([{id,g}]);else await sendSuggest2(s,{gender:g})}
+ const rest={};['roll','att'].forEach(k=>{if(get(k))rest[k]=get(k)});if(Object.keys(rest).length){if(rest.roll&&allStudents().some(x=>x.id!==id&&x.cls===s.cls&&x.roll===rest.roll))throw{message:'This roll number is already used in the class.'};if(adm)await patchStudents({[id]:rest},'Roll/attendance (ask box)');else await sendSuggest2(s,rest)}
+ const r=get('route'),sn=get('stopno');if(r||sn){const ed={};if(r)ed.route=r;if(sn)ed.stopno=sn;if(adm)await applyVillageEdits({[id]:ed},'');else{const rid=cleanId('v_'+id),d={sid:id,sname:s.name,cls:s.cls,village:vu(s.village),route:r||routeVal(s),stopno:sn||s.stopno||'',by:S.me.id,byName:S.me.name,at:Date.now()};await enqueue(()=>S.db.doc('vreq/'+rid).set(d));S.vreq[rid]=d}}
+ toast(adm?'Saved ✔':'Done / sent to the admin ✔',3500);refresh()};
+// ---- the box itself (replaces the old search box; keeps the live search below)
+function globalSearch(){const d=$('#dlg');d.hidden=false;const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ d.innerHTML=`<div><div class="row" style="flex-wrap:nowrap;gap:6px"><input type="search" id="gs_q" class="grow" placeholder="Ask or search — e.g. 6A के बच्चे, आरव का नंबर…" autocomplete="off">${SR?'<button class="btn sec sm" id="gs_mic" title="Speak">🎤</button>':''}<button class="btn sm" id="gs_go">Ask</button></div><div id="gs_a"></div><div id="gs_r" style="max-height:45vh;overflow:auto;margin-top:6px"></div><div class="row" style="justify-content:space-between;margin-top:8px"><button class="btn sec sm" id="gs_h">What can I ask?</button><button class="btn sec" id="gs_x">Close</button></div></div>`;
  $('#gs_x').onclick=unbusy;const inp=$('#gs_q');setTimeout(()=>{try{inp.focus()}catch(e){}},50);
  const all=allStudents(true).filter(canTouch);
- inp.oninput=()=>{const q=inp.value.trim().toLowerCase(),qd=q.replace(/\D/g,'');const R=$('#gs_r');if(q.length<2){R.innerHTML='<p class="muted small">Type at least 2 letters or digits.</p>';return}
+ const ask=()=>{const q=inp.value.trim();const A=$('#gs_a');if(!q){A.innerHTML='';return}let o=null;try{o=CMD.run(q)}catch(e){o=null}
+  if(!o){A.innerHTML='<div class="box"><span class="small muted">I did not understand this as a question. Search results are below. Tap “What can I ask?” for examples.</span></div>';return live()}
+  A.innerHTML=o.html;A.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>{inp.value=b.dataset.ex;ask()});if(o.after)o.after();$('#gs_r').innerHTML=''};
+ const live=()=>{const q=inp.value.trim().toLowerCase(),qd=q.replace(/\D/g,'');const R=$('#gs_r');if(q.length<2){R.innerHTML='';return}
   const hit=s=>[s.name,s.father,s.mother,s.id,s.sr,s.roll,s.att,s.village,s.cls,s.route1,s.stop1,s.spec].some(x=>x&&String(x).toLowerCase().includes(q))||(qd.length>=4&&[s.contact,s.contact2].some(x=>x&&mob10(x).includes(qd)));
-  const st=all.filter(hit).slice(0,25);
-  const tabs=tabsFor().filter(t=>t[1].toLowerCase().includes(q)).slice(0,6);
-  const clsH=[...new Set(all.map(s=>s.cls))].filter(c=>c.toLowerCase().includes(q)).sort(cmpClass).slice(0,6);
-  const vil=[...new Set(all.map(s=>vu(s.village)).filter(Boolean))].filter(x=>x.toLowerCase().includes(q)).slice(0,6);
-  R.innerHTML=(tabs.length?`<div class="grp">Tabs</div>${tabs.map(t=>`<div class="item" data-gt="${esc(t[0])}"><div class="grow nm">${esc(t[1])}</div></div>`).join('')}`:'')+(clsH.length?`<div class="grp">Classes</div>${clsH.map(c=>`<div class="item" data-gc2="${esc(c)}"><div class="grow nm">Class ${esc(c)}</div></div>`).join('')}`:'')+(vil.length?`<div class="grp">Villages</div>${vil.map(c=>`<div class="item" data-gv="${esc(c)}"><div class="grow nm">${esc(c)}</div></div>`).join('')}`:'')+(st.length?`<div class="grp">Students (${st.length}${st.length===25?'+':''})</div>${st.map(s=>`<div class="item" data-gs="${esc(s.id)}"><div class="grow"><div class="nm">${esc(s.name)}${s.left?' <span class="pill y">left</span>':''}</div><div class="mt">Class ${esc(s.cls)} · Roll ${esc(s.roll||'-')} · ${esc(s.id)}${s.father?' · '+esc(s.father):''}${s.village?' · '+esc(vu(s.village)):''}${s.sr?' · SR '+esc(s.sr):''}</div></div></div>`).join('')}`:'')||'<p class="muted small">Nothing found.</p>';
-  R.querySelectorAll('[data-gs]').forEach(x=>x.onclick=()=>{unbusy();openStudent(x.dataset.gs)});
-  R.querySelectorAll('[data-gt]').forEach(x=>x.onclick=()=>{unbusy();go(x.dataset.gt)});
-  R.querySelectorAll('[data-gc2]').forEach(x=>x.onclick=()=>{unbusy();S.fcls=x.dataset.gc2;go('students')});
-  R.querySelectorAll('[data-gv]').forEach(x=>x.onclick=()=>{unbusy();VW.open=x.dataset.gv;go('vwise')})}}
+  const st=all.filter(hit).slice(0,20),tabs=tabsFor().filter(t=>t[1].toLowerCase().includes(q)).slice(0,5);
+  R.innerHTML=(tabs.length?`<div class="grp">Screens</div>${tabs.map(t=>`<div class="item" data-gt="${esc(t[0])}"><div class="grow nm">${esc(t[1])}</div></div>`).join('')}`:'')+(st.length?`<div class="grp">Students</div>${st.map(s=>`<div class="item" data-gs="${esc(s.id)}"><div class="grow"><div class="nm">${esc(s.name)}${s.left?' <span class="pill y">left</span>':''}</div><div class="mt">Class ${esc(s.cls)} · Roll ${esc(s.roll||'-')} · ${esc(s.id)}${s.father?' · '+esc(s.father):''}${s.village?' · '+esc(vu(s.village)):''}</div></div></div>`).join('')}`:'');
+  R.querySelectorAll('[data-gs]').forEach(x=>x.onclick=()=>{unbusy();openStudent(x.dataset.gs)});R.querySelectorAll('[data-gt]').forEach(x=>x.onclick=()=>{unbusy();go(x.dataset.gt)})};
+ inp.oninput=()=>{$('#gs_a').innerHTML='';live()};inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ask()}};$('#gs_go').onclick=ask;
+ $('#gs_h').onclick=()=>{const A=$('#gs_a');const o=CMD.run('help');A.innerHTML=o.html;A.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>{inp.value=b.dataset.ex;ask()})};
+ if(SR&&$('#gs_mic'))$('#gs_mic').onclick=()=>{try{const r=new SR();r.lang='hi-IN';r.interimResults=false;r.onresult=e=>{inp.value=e.results[0][0].transcript;ask()};r.onerror=()=>toast('Could not hear. Try again or type.',3000);r.start();toast('Speak now…',2000)}catch(e){toast('Voice input is not available.',3000)}}}
 
 window.addEventListener('offline',()=>toast('No internet. You can keep working; changes are saved on this phone and will go to the server when the internet returns.',7000));window.addEventListener('online',()=>toast('Internet is back. Saving pending changes…',4000));
 // ---- Gender lists (all children, class-wise)
@@ -1612,6 +1740,7 @@ async function sibConflicts(conf){if(!conf||!conf.length)return;
  if(!can('edit')){try{for(const c of conf)await sendSuggest2(c.o,{[c.k]:c.v});toast('A sibling has different information. Sent to the admin for approval ✔',6000)}catch(e){toast(errMsg(e),6000)}return}
  const L=conf.map(c=>`${esc(c.o.name)}: ${FLD[c.k]||c.k} ${esc(c.cur)} → <b>${esc(c.v)}</b>`).join('<br>');
  ask(`The sibling(s) have different information. Update them too?<br><br>${L}`,async()=>{try{for(const c of conf)await sibApply(c.sid,c.k,c.v);toast('Siblings updated ✔');refresh()}catch(e){toast(errMsg(e),6000)}},'Update siblings')}
+
 
 // ================= Duplicate check (never by name alone) =================
 const DP={res:{red:[],yellow:[],sibs:[]},plan:{},sub:'',count:0,dirty:true};
