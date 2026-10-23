@@ -557,8 +557,8 @@ const EMAIL_DOM='@ris-staff.example.com';
 const mkAe=sid=>sid+'.'+rnd(10,'abcdefghjkmnpqrstuvwxyz23456789')+EMAIL_DOM;
 const isFakeEmail=e=>String(e||'').endsWith(EMAIL_DOM);
 const sidFromEmail=e=>String(e||'').split('@')[0].split('.')[0];
-const tempPw=()=>rnd(8,'abcdefghjkmnpqrstuvwxyz23456789');
-const MINPW=6;
+const tempPw=()=>rnd(12,'abcdefghjkmnpqrstuvwxyz23456789');
+const MINPW=10;
 function authMsg(e){const c=e&&e.code;
  if(c==='invalid_credential'||c==='wrong_password'||c==='user_not_found'||c==='invalid_login_credentials')return'Wrong password (or e-mail).';
  if(c==='invalid_email')return'This e-mail address is not valid.';
@@ -969,7 +969,18 @@ function exportListDialog(title,list){if(!list||!list.length)return toast('The l
  $('#xp_c').onclick=unbusy;
  $('#xp_x').onclick=async()=>{const cs=pick();if(!cs.length)return toast('Choose at least one column.');unbusy();try{await lib('XLSX');const H=['No.'].concat(cs.map(c=>c[1])),rows=list.map((s,i)=>[i+1].concat(cs.map(c=>c[2](s)||'')));const ws=XLSX.utils.aoa_to_sheet([H,...rows]);ws['!cols']=H.map(()=>({wch:18}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'LIST');await dl('RIS_'+title.replace(/[^A-Za-z0-9]+/g,'_')+'.xlsx',XLSX.write(wb,{bookType:'xlsx',type:'array'}))}catch(e){toast('Excel could not be created')}};
  $('#xp_p').onclick=async()=>{const cs=pick();if(!cs.length)return toast('Choose at least one column.');unbusy();await mkTablePdf(title,['No.'].concat(cs.map(c=>c[1])),list.map((s,i)=>[String(i+1)].concat(cs.map(c=>String(c[2](s)||'')))))}}
-async function mkTablePdf(title,H,rows){busy('Creating PDF…');try{await lib('jspdf');const land=H.length>6,W=land?297:210,Hh=land?210:297;const pdf=new jspdf.jsPDF({unit:'mm',format:'a4',orientation:land?'landscape':'portrait'});
+async function mkTablePdfImg(title,H,rows){await lib('jspdf');await lib('html2canvas');const land=H.length>6,W=land?297:210,Hh=land?210:297,pxW=land?1123:794,per=land?22:32;
+ const pdf=new jspdf.jsPDF({unit:'mm',format:'a4',orientation:land?'landscape':'portrait'});const host=document.createElement('div');
+ host.style.cssText=`position:fixed;left:-99999px;top:0;width:${pxW}px;background:#fff;color:#000;font-family:Hind,'Noto Sans Devanagari',Mangal,system-ui,sans-serif;font-size:13px;line-height:1.35`;document.body.appendChild(host);
+ try{const N=Math.max(1,Math.ceil(rows.length/per)),cs=`border:1px solid #888;padding:4px 6px;text-align:left;word-break:break-word;vertical-align:top`;
+  for(let pg=0;pg<N;pg++){busyP(`${pg+1} / ${N}`,pg/N);const ch=rows.slice(pg*per,(pg+1)*per);
+   host.innerHTML=`<div style="padding:22px 26px"><div style="font-weight:700;font-size:15px;margin-bottom:8px">${esc(S.settings.name)} — ${esc(title)} (${rows.length}) · ${esc(fmtDate(today()))} · Page ${pg+1}/${N}</div><table style="border-collapse:collapse;width:100%"><tr>${H.map((h,i)=>`<th style="${cs};background:#e8ecf3;${i===0?'width:34px':''}">${esc(String(h))}</th>`).join('')}</tr>${ch.map(r=>`<tr>${H.map((h,i)=>`<td style="${cs}">${esc(String(r[i]==null?'':r[i]))}</td>`).join('')}</tr>`).join('')}</table></div>`;
+   const cv=await html2canvas(host,{scale:2,backgroundColor:'#fff',logging:false});let w=W,h=W*cv.height/cv.width;if(h>Hh){h=Hh;w=Hh*cv.width/cv.height}
+   if(pg)pdf.addPage();pdf.addImage(cv.toDataURL('image/jpeg',0.9),'JPEG',0,0,w,h)}
+  const blob=pdf.output('blob');unbusy();await deliver('RIS_'+title.replace(/[^A-Za-z0-9]+/g,'_')+'.pdf',blob)}finally{host.remove()}}
+async function mkTablePdf(title,H,rows){busy('Creating PDF…');
+ const nl=t=>/[^\x00-\xff]/.test(String(t==null?'':t));if(rows.some(r=>r.some(c=>nl(c)||String(c==null?'':c).length>22))||H.some(nl)){try{await mkTablePdfImg(title,H,rows);return}catch(e){busy('Creating PDF…')}}
+ try{await lib('jspdf');const land=H.length>6,W=land?297:210,Hh=land?210:297;const pdf=new jspdf.jsPDF({unit:'mm',format:'a4',orientation:land?'landscape':'portrait'});
  const m=10,tw=W-2*m;const wts=H.map((h,i)=>i===0?4:Math.max(8,Math.min(26,Math.max(String(h).length,...rows.slice(0,60).map(r=>String(r[i]||'').length)))));const sum=wts.reduce((a,b)=>a+b,0),cw=wts.map(x=>x/sum*tw);
  const lh=6;let y=m+8,page=1;const head=()=>{pdf.setFontSize(12);pdf.text(S.settings.name+' — '+title+'  ('+rows.length+')  '+fmtDate(today()),m,m+2);pdf.setFontSize(8);let x=m;H.forEach((h,i)=>{pdf.text(String(h),x,y);x+=cw[i]});y+=2;pdf.line(m,y,W-m,y);y+=lh-1};head();
  rows.forEach(r=>{if(y>Hh-m){pdf.addPage();page++;y=m+8;head()}let x=m;pdf.setFontSize(8);r.forEach((c,i)=>{const mx=Math.max(2,Math.floor(cw[i]/1.55));let t=String(c==null?'':c);if(t.length>mx)t=t.slice(0,mx-1)+'…';pdf.text(t,x,y);x+=cw[i]});y+=lh});
