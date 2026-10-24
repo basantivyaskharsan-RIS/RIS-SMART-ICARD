@@ -1376,7 +1376,7 @@ function viewPhones(){const v=$('#view');const cl=can('all')?Object.values(S.cla
  v.innerHTML=`<h2>Phone numbers — class-wise</h2><p class="muted small">Choose a class. Type each number or pick it from the phone book (📖). One number (father's or mother's) is enough. Then tap Save.</p>
 <div class="box"><select id="ph_c">${cl.map(c=>`<option value="${esc(c)}" ${c===PH.cls?'selected':''}>${esc(c)} (${allStudents().filter(s=>s.cls===c).length})</option>`).join('')}</select><datalist id="vg_dl2">${villageList().map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
 ${(()=>{const q=L=>{let fa=0,ma=0,bo=0,on=0,no=0;L.forEach(s=>{const f=/^\d{10}$/.test(mob10(s.contact)),m=/^\d{10}$/.test(mob10(s.contact2));if(f)fa++;if(m)ma++;if(f&&m)bo++;else if(f||m)on++;else no++});return[L.length,fa,ma,bo,on,no]};const all2=allStudents().filter(s=>cl.includes(s.cls));return tblHTML(['','Total','Father no.','Mother no.','Both','Only one','None'],[['Class '+PH.cls].concat(q(list)),['All classes'].concat(q(all2))])})()}<p class="small muted" style="margin:6px 0 0">${list.length} students · without any number: <b class="${miss?'bad':'ok'}">${miss}</b>${e.floor||e.room?' · '+esc(e.floor)+(e.room?' · Room '+esc(e.room):''):''}</p>
-<label class="row small" style="gap:6px;margin-top:8px"><input type="checkbox" id="ph_o" ${PH.only?'checked':''}> Show only children without a number</label><div class="row" style="margin-top:8px"><button class="btn sec sm" id="ph_fill">📇 Fill from contacts file</button><button class="btn sec sm" id="ph_pr">🖨 Contact list (A4 PDF / Excel)</button></div><div id="ph_bar"></div></div>
+<label class="row small" style="gap:6px;margin-top:8px"><input type="checkbox" id="ph_o" ${PH.only?'checked':''}> Show only children without a number</label><div class="row" style="margin-top:8px"><button class="btn sec sm" id="ph_fill">📇 Fill from contacts file</button><button class="btn sm" id="ph_cl">📄 Contact List (RIS format · editable)</button><button class="btn sec sm" id="ph_pr">Excel / simple PDF</button></div><div id="ph_bar"></div></div>
 <div class="box">${shown.length?shown.map((s,i)=>{const cu=PH.edits[s.id]||{};const fv=cu.f!==undefined?cu.f:(s.contact||''),mv=cu.m!==undefined?cu.m:(s.contact2||'');const editing=PH.open.has(s.id)||(!s.contact&&!s.contact2)||cu.f!==undefined||cu.m!==undefined;const sid=esc(s.id);
  const head=`<div class="nm"><span class="sn">${i+1}.</span> ${esc(s.name)}${s.village?` <span class="vp">📍 ${esc(vu(s.village))}</span>`:''}</div><div class="mt muted small">Roll ${esc(s.roll||'-')}${s.father?' · Father: '+esc(s.father):''}${s.mother?' · Mother: '+esc(s.mother):''}</div>`;
  const body=editing?`<div class="row" style="flex-wrap:nowrap;margin-top:4px"><input type="tel" data-ph="f" data-id="${sid}" id="pf_${sid}" placeholder="Father mobile" value="${esc(fv)}"><button type="button" class="btn sec sm" data-pick="pf_${sid}" data-stu="${sid}">📖</button></div>
@@ -1390,6 +1390,7 @@ ${(()=>{const q=L=>{let fa=0,ma=0,bo=0,on=0,no=0;L.forEach(s=>{const f=/^\d{10}$
  $('#ph_c').onchange=e=>{if(Object.keys(PH.edits).length&&!confirm('Unsaved numbers will be lost. Continue?')){e.target.value=PH.cls;return}PH.cls=e.target.value;PH.edits={};PH.open=new Set();viewPhones()};
  const keep=fn=>{const y=window.scrollY;fn();window.scrollTo(0,y)};
  $('#ph_fill').onclick=phoneMatch;
+ $('#ph_cl').onclick=()=>{if(Object.keys(PH.edits).length&&!confirm('Unsaved numbers are not in the list. Continue?'))return;contactListForm(PH.cls,false)};
  $('#ph_pr').onclick=()=>exportTableDialog('Contact_list_Class_'+PH.cls,[[PH.cls,['No.','Student','Father','Contact 1','Contact 2'],list.map((s,i)=>[i+1,s.name,s.father||'',s.contact||'',s.contact2||''])]]);
  v.querySelectorAll('[data-pe]').forEach(b=>b.onclick=()=>{PH.open.add(b.dataset.pe);keep(viewPhones)});
  v.querySelectorAll('[data-pc]').forEach(b=>b.onclick=()=>{PH.open.delete(b.dataset.pc);delete PH.edits[b.dataset.pc];keep(viewPhones)});
@@ -2105,6 +2106,51 @@ const tblHTML=(H,rows,boldLast)=>`<div class="scr"><table class="t"><tr>${H.map(
 function exportTableDialog(title,sheets){const d=$('#dlg');d.hidden=false;d.innerHTML=`<div><b>Export: ${esc(title)}</b><div class="row" style="margin-top:10px"><button class="btn grow" id="et_x">Excel</button><button class="btn grow" id="et_p">PDF</button></div><div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn sec" id="et_c">Close</button></div></div>`;
  $('#et_c').onclick=unbusy;$('#et_x').onclick=async()=>{unbusy();try{await lib('XLSX');const wb=XLSX.utils.book_new();sheets.forEach(([n,H,rows])=>{const ws=XLSX.utils.aoa_to_sheet([H,...rows]);ws['!cols']=H.map(()=>({wch:16}));XLSX.utils.book_append_sheet(wb,ws,String(n).slice(0,30))});await dl('RIS_'+title.replace(/[^A-Za-z0-9]+/g,'_')+'.xlsx',XLSX.write(wb,{bookType:'xlsx',type:'array'}))}catch(e){toast('Excel could not be created')}};
  $('#et_p').onclick=async()=>{unbusy();if(sheets.length===1)return mkTablePdf(title,sheets[0][1],sheets[0][2].map(r=>r.map(x=>x==null?'':String(x))));const w=sheets.reduce((a,x)=>x[1].length>a[1].length?x:a,sheets[0]),rows=[];sheets.forEach(([n,h,r],k)=>{if(k)rows.push(h.map(()=>''));rows.push(['== '+n+' =='].concat(h.slice(1).map(()=>'')));rows.push(h);r.forEach(x=>rows.push(x))});await mkTablePdf(title,w[1].map((x,i)=>i?'':'Table'),rows.map(r=>r.map(x=>x==null?'':String(x))))}}
+// ---------- Contact List (RIS format, editable before PDF) ----------
+const CLF={rows:25};
+function clSplit(cls){const m=String(cls||'').match(/^(.*?)\s*-\s*([A-Za-z0-9]{1,2})$/);return m?{c:m[1],s:m[2]}:{c:String(cls||''),s:''}}
+function clPageHTML(d,pg,N,blank){const per=CLF.rows,start=pg*per,E=blank?'':'';const rows=[];
+ for(let i=0;i<per;i++){const r=d.rows[start+i];const n=start+i+1;
+  rows.push(`<tr><td class="n">${n}</td>${[0,1,2,3,4,5].map(k=>`<td contenteditable="true" data-r="${start+i}" data-k="${k}">${r&&!blank?esc(r[k]||''):''}</td>`).join('')}</tr>`)}
+ const ed=(k,v,w)=>`<span class="ln" contenteditable="true" data-h="${k}" style="min-width:${w}px">${esc(v||'')}</span>`;
+ return `<div class="clp"><div class="cl-top"><img src="${LOGO}" alt=""></div>
+<div class="cl-ttl"><i></i><b>CONTACT LIST</b><i></i></div>
+<div class="cl-info"><span>Class : ${ed('c',d.c,70)}</span><span>Section : ${ed('s',d.s,70)}</span><span>Class Teacher : ${ed('t',d.t,150)}</span><span>Session : ${ed('y',d.y,90)}</span></div>
+<table class="cl-t" style="--rh:${(745/per).toFixed(2)}px"><thead><tr><th style="width:44px">S.No.</th><th>Name</th><th>Father's Name</th><th>Village</th><th>Contact No. 1<small>(Parent)</small></th><th>Contact No. 2<small>(Parent)</small></th><th>Contact No. 3<small>(Other / Emergency)</small></th></tr></thead><tbody>${rows.join('')}</tbody></table>
+<div class="cl-ft"><i></i><b>An Educational Revolution</b><i></i></div>${N>1?`<div class="cl-pg">Page ${pg+1} / ${N}</div>`:''}</div>`}
+const CL_CSS=`.clp{width:794px;height:1123px;box-sizing:border-box;background:#fff;color:#0d2a73;padding:22px 28px;font-family:Hind,'Noto Sans Devanagari',Mangal,Arial,sans-serif;position:relative;overflow:hidden}
+.clp *{box-sizing:border-box}.cl-top{text-align:center}.cl-top img{width:590px;height:auto;display:inline-block}
+.cl-ttl{display:flex;align-items:center;gap:14px;margin:8px 0 10px}.cl-ttl i{flex:1;height:3px;border-top:1px solid #1d56b0;border-bottom:1px solid #1d56b0}.cl-ttl b{background:#1d56b0;color:#fff;border-radius:22px;padding:6px 46px;font-size:24px;letter-spacing:1px;font-family:Arial,sans-serif}
+.cl-info{display:flex;justify-content:space-between;flex-wrap:nowrap;align-items:flex-end;border:1.5px solid #1d56b0;border-radius:10px;background:#eaf2fc;padding:8px 12px;margin-bottom:10px;font:bold 13px Arial,sans-serif;white-space:nowrap}
+.cl-info .ln{display:inline-block;border-bottom:1px solid #1d56b0;font-weight:600;padding:0 4px;min-height:16px;vertical-align:bottom;background:transparent;outline:none}
+.cl-t{width:100%;border-collapse:separate;border-spacing:0;border:1.5px solid #1d56b0;border-radius:10px;overflow:hidden;table-layout:fixed}
+.cl-t th{background:#dbe8f8;font:bold 13px Arial,sans-serif;padding:6px 3px;height:42px;border-right:1px solid #1d56b0;text-align:center;color:#0d2a73}.cl-t th small{display:block;font-size:9.5px;font-weight:600}
+.cl-t td{height:var(--rh,35.3px);border-top:1px solid #8fb0dc;border-right:1px solid #1d56b0;padding:0 5px;font:12.5px Hind,'Noto Sans Devanagari',Arial,sans-serif;color:#000;overflow:hidden;white-space:nowrap;outline:none}
+.cl-t td.n{text-align:center;font:bold 12.5px Arial,sans-serif;color:#0d2a73}.cl-t th:last-child,.cl-t td:last-child{border-right:0}
+.cl-ft{position:absolute;left:28px;right:28px;bottom:26px;display:flex;align-items:center;gap:14px}.cl-ft i{flex:1;border-top:1px solid #1d56b0;border-bottom:1px solid #1d56b0;height:3px}.cl-ft b{font:italic bold 20px Arial,sans-serif;color:#1d56b0}
+.cl-pg{position:absolute;right:30px;bottom:6px;font:11px Arial;color:#555}`;
+function contactListForm(cls,blank){
+ const list=sortStudents(allStudents().filter(s=>s.cls===cls));const sp=clSplit(cls);
+ const tch=Object.values(S.staff||{}).filter(x=>x&&x.cat==='teacher'&&(x.classes||[]).includes(cls)).map(x=>x.name).join(', ');
+ const d={c:sp.c,s:sp.s,t:tch,y:String((S.settings&&S.settings.session)||''),rows:list.map(s=>[s.name||'',s.father||'',vu(s.village||''),s.contact||'',s.contact2||'',''].map(x=>String(x))).map(r=>[r[0],r[1],r[2],r[3],r[4],r[5]])};
+ // table columns: 0 name,1 father,2 village,3 c1,4 c2,5 c3
+ const N=Math.max(1,Math.ceil((blank?0:d.rows.length)/CLF.rows));
+ const ov=document.createElement('div');ov.id='cl_ov';ov.style.cssText='position:fixed;inset:0;z-index:9999;background:#e9edf4;overflow:auto;-webkit-overflow-scrolling:touch';
+ const render=()=>{const w=Math.min(window.innerWidth-16,794),z=w/794;ov.innerHTML=`<style>${CL_CSS}.clw{margin:8px auto;box-shadow:0 1px 8px #0004;width:${w}px;height:${1123*z}px;overflow:hidden}.clw .clp{transform:scale(${z});transform-origin:0 0}.clbar{position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid #ccd;padding:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font:14px system-ui}.clbar button{font:inherit;padding:9px 12px;border:0;border-radius:9px;background:#1d56b0;color:#fff}.clbar button.s{background:#6b7a99}</style>
+<div class="clbar"><button id="cl_pdf">📄 PDF / Print</button><button class="s" id="cl_bl">${blank?'Fill with students':'Blank form'}</button><label>Rows/page <select id="cl_rp"><option>20</option><option>25</option><option>30</option></select></label><button class="s" id="cl_x">✕ Close</button><span style="flex-basis:100%;font-size:12px;color:#456">Tap any cell or the Class / Teacher / Session line to edit it. Edits here are only for this printout — student data is not changed.</span></div>`+
+  Array.from({length:N},(_,p)=>`<div class="clw">${clPageHTML(d,p,N,blank)}</div>`).join('');
+  ov.querySelector('#cl_rp').value=String(CLF.rows);
+  ov.querySelectorAll('[data-h]').forEach(e=>e.oninput=()=>{d[e.dataset.h]=e.textContent.trim();ov.querySelectorAll(`[data-h="${e.dataset.h}"]`).forEach(o=>{if(o!==e)o.textContent=e.textContent})});
+  ov.querySelectorAll('td[data-k]').forEach(e=>{e.oninput=()=>{const r=+e.dataset.r,k=+e.dataset.k;while(d.rows.length<=r)d.rows.push(['','','','','','']);d.rows[r][k]=e.textContent}});
+  ov.querySelector('#cl_x').onclick=()=>ov.remove();
+  ov.querySelector('#cl_bl').onclick=()=>{ov.remove();contactListForm(cls,!blank)};
+  ov.querySelector('#cl_rp').onchange=e=>{CLF.rows=+e.target.value;ov.remove();contactListForm(cls,blank)};
+  ov.querySelector('#cl_pdf').onclick=()=>clPdf(d,N,blank)};
+ document.body.appendChild(ov);render()}
+async function clPdf(d,N,blank){busy('Creating PDF…');let host;try{await lib('jspdf');await lib('html2canvas');
+ const pdf=new jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'});host=document.createElement('div');host.style.cssText='position:fixed;left:-99999px;top:0;width:794px;background:#fff';document.body.appendChild(host);
+ for(let p=0;p<N;p++){busyP(`${p+1} / ${N}`,p/N);host.innerHTML=`<style>${CL_CSS}</style>`+clPageHTML(d,p,N,blank);const cv=await html2canvas(host,{scale:2,backgroundColor:'#fff',logging:false});if(p)pdf.addPage();pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297)}
+ const blob=pdf.output('blob');unbusy();await deliver('RIS_Contact_List_'+String((d.c+'_'+d.s)).replace(/[^A-Za-z0-9]+/g,'_')+'.pdf',blob)}catch(e){unbusy();toast('PDF could not be created: '+(e&&e.message||e))}finally{if(host)host.remove()}}
 // ---------- statistics ----------
 function statsData(){const all=allStudents();const cls=[...new Set(all.map(s=>s.cls))].sort(cmpClass);const G=s=>s.gender==='F'?1:s.gender==='M'?0:2;const CT=CATS2.concat(['Not set']);const Ci=s=>{const i=CATS2.indexOf(s.cat2);return i<0?CATS2.length:i};
  const cnt=(arr,f,n)=>{const a=Array(n).fill(0);arr.forEach(s=>a[f(s)]++);return a};const tot=a=>a.reduce((x,y)=>x+y,0);
