@@ -254,7 +254,7 @@ const LOGO="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDA
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const S={db:null,isOwner:false,login:{},loginLoaded:false,staffSeen:false,lastPw:null,settings:{name:'Radiant International School',address:'',session:'2026-27',phone1:'9784982560',phone2:'9783614377',color:'#3c4a63',showSr:false},
- classes:{},thumbs:{},rte:{},cinfo:{},suggest:{},flags:{},activity:{},staff:{},contacts:{},priv:{},vreq:{},idreq:{},pwrm:{},admins:{},fyear:'',sort:'',justPhoto:null,meta:{backup:null,dupok:null,sib:null,design:null,villages:null,bus:null,gok:null},
+ classes:{},thumbs:{},rte:{},cinfo:{},suggest:{},flags:{},activity:{},staff:{},contacts:{},priv:{},vreq:{},idreq:{},pwrm:{},atask:{},todo:{},admins:{},fyear:'',sort:'',justPhoto:null,meta:{backup:null,dupok:null,sib:null,design:null,villages:null,bus:null,gok:null},
  me:null,layout:'9',tab:'students',q:'',fcls:'',fmiss:false,frte:false,fph:'',fflag:'',more:60,onlyPhoto:true,ready:false,chg:0,saveFail:false,imp:null};
 const photoCache={};
 let unsubs=[];
@@ -358,7 +358,7 @@ function cardHTML(st,photo){const D=designFor(st.cls),s=S.settings,c=routeColor(
   else if(row.k==='village'){body+=st.native?rw(row,`<div class="c" style="flex:0 1 auto;font-size:12px"><b>${esc(lb||'Village')}:</b><span>${esc(vu(st.village)||'-')}</span></div><div class="c" style="flex:1 1 0;margin-left:10px;font-size:12px"><b>Native District:</b><span>${esc(st.native)}</span></div>`):rw(row,cell(lb||'Village',vu(st.village)))}
   else if(row.k==='special'){if(st.spec)body+=rw(row,cell(lb||'Special No.',st.spec))}
   else if(row.k==='route1')body+=rw(row,cell2(lb||'Bus Route - Primary -',routeText(st.route1,st.stop1)));
-  else if(row.k==='route2')body+=rw(row,cell2(lb||'Bus Route - Secondary -',routeText(st.route2,st.stop2)))});
+  else if(row.k==='route2'){if(st.route2||st.stop2||st._r2)body+=rw(row,cell2(lb||'Bus Route - Secondary -',routeText(st.route2,st.stop2)))}});
  const el=D.elderOn?elderInfo(st):null;
  const foot=D.footOne?`<div class="ft" data-dzk="foot" style="background:${c2[0]}"><div class="lb">${esc(D.footLabel)}</div><div class="nums1">${[s.phone1,s.phone2].filter(Boolean).map(esc).join(' &nbsp;|&nbsp; ')}</div></div>`:`<div class="ft" data-dzk="foot" style="background:${c2[0]}"><div class="lb">${esc(D.footLabel)}</div><div class="nums"><span>${esc(s.phone1||'')}</span><span>${esc(s.phone2||'')}</span></div></div>`;
  return `<div class="idc" style="background:${classTint(st.cls)}"><img class="wm" src="${EMB}"><div class="lg"><img src="${LOGO}"></div>
@@ -505,6 +505,8 @@ async function ensureExtras(){if(can('all')||!S.me)return;const need=scopeStuden
 function subAll(){clearSubs(unsubs);XL.loaded=new Set();XL.extraTh=new Set();const all=can('all');
  ['classes','rte','cinfo','suggest','flags','vreq','idreq'].forEach(c=>unsubs.push(sc(c,c,c==='classes'?ensureExtras:null)));
  unsubs.push(S.db.collection('pwrm').onSnapshot(sn=>{S.pwrm={};sn.docs.forEach(d=>S.pwrm[d.id]=d.data());refresh()},()=>{}));
+ if(isAdmin()||(S.me&&S.me.cat==='acct'))unsubs.push(S.db.collection('atask').onSnapshot(sn=>{S.atask={};sn.docs.forEach(d=>S.atask[d.id]=d.data());refresh()},()=>{}));
+ if(isAdmin())unsubs.push(S.db.collection('todo').onSnapshot(sn=>{S.todo={};sn.docs.forEach(d=>S.todo[d.id]=d.data());refresh()},()=>{}));
  if(all)unsubs.push(sc('thumbs','thumbs'));
  else{const mc=myCls().slice(0,30);if(mc.length)unsubs.push(S.db.collectionIn('thumbs','cls',mc).onSnapshot(sn=>{const ex={};XL.extraTh.forEach(id=>{if(S.thumbs[id])ex[id]=S.thumbs[id]});S.thumbs=ex;sn.docs.forEach(d=>S.thumbs[d.id]=d.data());refresh()},onErr))}
  if(all)unsubs.push(S.db.collection('contacts').onSnapshot(sn=>{S.contacts={};sn.docs.forEach(d=>S.contacts[d.id]=d.data());refresh()},()=>{}));
@@ -513,7 +515,7 @@ function subAll(){clearSubs(unsubs);XL.loaded=new Set();XL.extraTh=new Set();con
  unsubs.push(S.db.collection('staff').onSnapshot(sn=>{S.staff={};sn.docs.forEach(d=>S.staff[d.id]=d.data());syncMe();refresh()},onErr));
  unsubs.push(S.db.doc('meta/backup').onSnapshot(sn=>{S.meta.backup=sn.exists?sn.data():null;renderBars()},onErr));
  if(isAdmin()){unsubs.push(sc('activity','activity'));unsubs.push(sc('admins','admins'));purgeBin()}}
-function clearData(){clearSubs(unsubs);S.classes={};S.thumbs={};S.rte={};S.cinfo={};S.suggest={};S.flags={};S.activity={};S.staff={};S.staffSeen=false;S.lastPw=null;S.contacts={};S.priv={};S.vreq={};S.idreq={};S.pwrm={};S.admins={};S.meta.design=null;S.meta.villages=null;S.meta.bus=null;S.meta.gok=null;S.fph='';S.fflag='';XL.loaded=new Set();XL.extraTh=new Set();S.fyear='';S.sort='';S.meta.backup=null;S.meta.dupok=null;S.meta.sib=null;S.imp=null;S.q='';S.fcls='';S.fmiss=false;S.frte=false;S.tab='students';S.more=60;DP.plan={};DP.sub='';for(const k in photoCache)delete photoCache[k]}
+function clearData(){clearSubs(unsubs);S.classes={};S.thumbs={};S.rte={};S.cinfo={};S.suggest={};S.flags={};S.activity={};S.staff={};S.staffSeen=false;S.lastPw=null;S.contacts={};S.priv={};S.vreq={};S.idreq={};S.pwrm={};S.atask={};S.todo={};S.admins={};S.meta.design=null;S.meta.villages=null;S.meta.bus=null;S.meta.gok=null;S.fph='';S.fflag='';XL.loaded=new Set();XL.extraTh=new Set();S.fyear='';S.sort='';S.meta.backup=null;S.meta.dupok=null;S.meta.sib=null;S.imp=null;S.q='';S.fcls='';S.fmiss=false;S.frte=false;S.tab='students';S.more=60;DP.plan={};DP.sub='';for(const k in photoCache)delete photoCache[k]}
 function choose(msg,btns){const d=$('#dlg');d.hidden=false;d.innerHTML=`<div><p style="margin-top:0">${msg}</p><div class="row" style="justify-content:flex-end">${btns.map((b,i)=>`<button class="btn ${b.c||''}" data-i="${i}">${b.t}</button>`).join('')}</div></div>`;
  d.querySelectorAll('button').forEach(b=>b.onclick=()=>{unbusy();const f=btns[+b.dataset.i].f;if(f)f()})}
 function copyText(t){const done=()=>toast('Copied ✔');try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,()=>fb())}else fb()}catch(e){fb()}
@@ -722,22 +724,24 @@ async function delStudent(st,quiet){const oc=S.classes[st.ckey];if(!oc)return;co
  const shared=allStudents().some(s=>s.id===st.id); // same ID still used elsewhere: keep its photo/RTE
  if(!shared&&S.thumbs[st.id]){await save(()=>S.db.doc('thumbs/'+st.id).delete());await save(()=>S.db.doc('photos/'+st.id).delete()).catch(()=>{});delete S.thumbs[st.id]}
  if(!shared&&S.rte[st.id]){await save(()=>S.db.doc('rte/'+st.id).delete()).catch(()=>{});delete S.rte[st.id]}
- if(!quiet){closeSheet()}refresh();if(bid&&!st._noUndo)undoToast('Deleted: '+st.name,()=>restoreBin(bid),8000);return bid}
+ if(!quiet){closeSheet()}refresh();if(bid&&!st._noUndo){if(BULK.ids)BULK.ids.push(bid);else undoToast('Deleted: '+st.name,()=>restoreBin(bid),8000)}return bid}
+const BULK={ids:null};
+function bulkEnd(label){const ids=BULK.ids;BULK.ids=null;if(ids&&ids.length)undoToast(label+' — '+ids.length+' child record(s) removed',async()=>{let n=0;for(const i of ids){try{await restoreBin(i);n++}catch(e){}}refresh();toast('Restored '+n+' of '+ids.length+' removed record(s). (Changes already made to the kept records stay.)',6000)},12000)}
 async function setRte(id,v,quiet){if((!!(S.rte[id]&&S.rte[id].v===1))===v)return;try{const d={v:v?1:0,at:Date.now()};await save(()=>S.db.doc('rte/'+id).set(d));S.rte[id]=d;if(!quiet){toast(v?'RTE: Yes — -R added at the end of ID':'RTE: No');openStudent(id);refresh()}}catch(e){toast(errMsg(e),6000)}}
 function lateOf(c){if(!(c.ok&&c.okAt))return 0;return studentsOf(c.name).filter(s=>{const t=S.thumbs[s.id],r=S.rte[s.id],ci=S.cinfo[s.seatKey];return(t&&t.at>c.okAt)||(r&&r.at>c.okAt)||(ci&&ci.at>c.okAt)}).length}
 
 // ================= Tabs & main render =================
 function navGroups(){const inb=Object.keys(S.suggest).length+Object.keys(S.flags).length,dp=DP.count||0,vq=Object.keys(S.vreq).length,iq=Object.keys(S.idreq).length,gs=(GCK.list||[]).length,pwn=Object.values(S.pwrm||{}).filter(x=>x.status==='pending').length+(isAdmin()?Object.values(S.pwrm||{}).filter(x=>x.status==='asked').length:0);const L=(id,nm,n)=>({id,nm,n:n||0});const Gp=(k,ic,nm,leaves)=>({k,ic,nm,leaves,n:leaves.reduce((a,l)=>a+l.n,0)});
  if(isAdmin())return[
-  Gp('students','🎓','Students',[L('students','List'),L('phones','Phones'),L('rolls','Roll & Att. no.'),L('gender','Gender check',gs),L('gall','Gender lists'),L('cnts','Counts & lists'),L('dups','Duplicates',dp),L('pwrm','Remove from portal',pwn),L('divide','Divide sections')]),
+  Gp('students','🎓','Students',[L('students','List'),L('phones','Phones'),L('clist','Contact List'),L('rolls','Roll & Att. no.'),L('gender','Gender check',gs),L('gall','Gender lists'),L('cnts','Counts & lists'),L('dups','Duplicates',dp),L('pwrm','Remove from portal',pwn),L('divide','Divide sections')]),
   Gp('classes','🏫','Classes',[L('classes','Classes')]),
   Gp('req','📨','Requests',[L('inbox','General',inb),L('vreq','Village',vq),L('idreq','ID card',iq)]),
   Gp('bus','🚌','Bus',[L('village','Village & stops'),L('vwise','Village-wise'),L('routes','Routes'),L('bus','Timetable'),L('busrep','Bus report')]),
   Gp('idc','🪪','ID Card',[L('design','Card design'),L('idreq','ID requests',iq),L('prn','Printed / Due'),L('due','Due entries',DUE.count()),L('staffid','Staff cards'),L('bulk','Bulk photos')]),
-  Gp('more','☰','More',[L('rep','Reports'),L('staff','Staff'),L('settings','Settings')])];
- if(S.me&&S.me.cat==='teacher')return[Gp('students','🎓','My Class',[L('students','List'),L('myc','My classes'),L('phones','Phones'),L('rolls','Roll & Att. no.'),L('due','Due entries',DUE.count())]),Gp('bus','🚌','Village & bus',[L('village','Village & bus'),L('vwise','Village-wise')]),Gp('bulk','📷','Bulk Photos',[L('bulk','Bulk Photos')])];
- const st=[L('students','List')];if(can('contact'))st.push(L('phones','Phones'));const G=[Gp('students','🎓','Students',st)];
- if(can('pdf'))G.push(Gp('classes','🏫','Classes',[L('classes','Classes')]));if(can('report'))G.push(Gp('rep','📊','Reports',[L('rep','Reports')]));if(can('bulk'))G.push(Gp('bulk','📷','Bulk Photos',[L('bulk','Bulk Photos')]));if(S.me&&S.me.cat==='acct')G.push(Gp('pwrm','🗑','Portal removal',[L('pwrm','Remove from portal',pwn)]));return G}
+  Gp('more','☰','More',[L('rep','Reports'),L('tasks','Tasks',tkBadge()),L('staff','Staff'),L('settings','Settings')])];
+ if(S.me&&S.me.cat==='teacher')return[Gp('students','🎓','My Class',[L('students','List'),L('myc','My classes'),L('phones','Phones'),L('clist','Contact List'),L('rolls','Roll & Att. no.'),L('due','Due entries',DUE.count())]),Gp('bus','🚌','Village & bus',[L('village','Village & bus'),L('vwise','Village-wise')]),Gp('bulk','📷','Bulk Photos',[L('bulk','Bulk Photos')])];
+ const st=[L('students','List')];if(can('contact'))st.push(L('phones','Phones'));if(can('contact')||can('pdf'))st.push(L('clist','Contact List'));const G=[Gp('students','🎓','Students',st)];
+ if(can('pdf'))G.push(Gp('classes','🏫','Classes',[L('classes','Classes')]));if(can('report'))G.push(Gp('rep','📊','Reports',[L('rep','Reports')]));if(can('bulk'))G.push(Gp('bulk','📷','Bulk Photos',[L('bulk','Bulk Photos')]));if(S.me&&S.me.cat==='acct'){G.push(Gp('pwrm','🗑','Portal removal',[L('pwrm','Remove from portal',pwn)]));G.push(Gp('tasks','✅','My tasks',[L('tasks','My tasks',tkBadge())]))}return G}
 function tabsFor(){const seen=new Set(),o=[];navGroups().forEach(g=>g.leaves.forEach(l=>{if(!seen.has(l.id)){seen.add(l.id);o.push([l.id,l.nm,l.n])}}));return o}
 function curGroup(){const G=navGroups();let g=G.find(x=>x.k===S.grp&&x.leaves.some(l=>l.id===S.tab))||G.find(x=>x.leaves.some(l=>l.id===S.tab));if(!g){g=G[0];S.tab=g.leaves[0].id}S.grp=g.k;S.gl=S.gl||{};S.gl[g.k]=S.tab;return[G,g]}
 function go(tab,grp){if(tab===S.tab&&(!grp||grp===S.grp))return;S.stack=S.stack||[];S.stack.push({t:S.tab,g:S.grp});if(S.stack.length>40)S.stack.shift();S.tab=tab;if(grp)S.grp=grp;S.more=60;try{history.pushState({t:1},'')}catch(e){}renderAll(true);window.scrollTo(0,0)}
@@ -759,7 +763,7 @@ function renderAll(force){renderTop();
  showTabs();renderBars();const v=$('#view');const tab=S.tab;
  if(tab==='students'){if(!v.querySelector('#stuShell')||force)buildStudents();updateList();return}
  if(!force&&typing())return;
- ({classes:viewClasses,staff:()=>{SS.only=false;viewStaff()},staffid:()=>{SS.only=true;SS.sub='cards';viewStaff()},inbox:viewInbox,dups:viewDups,divide:viewDivide,rep:()=>{RP.only=false;viewReports()},busrep:()=>{RP.only=true;RP.sub='bus';viewReports()},prn:()=>{RP.only=true;RP.sub='prn';viewReports()},routes:viewRoutes,bulk:viewBulk,settings:viewSettings,phones:viewPhones,village:viewVillage,vreq:viewVreq,idreq:viewIdreq,due:viewDue,pwrm:viewPw,rolls:viewRolls,gall:viewGall,cnts:viewCnts,myc:viewMyc,vwise:viewVwise,gender:viewGender,design:viewDesign,bus:viewBus})[tab]();updBack()}
+ ({classes:viewClasses,staff:()=>{SS.only=false;viewStaff()},staffid:()=>{SS.only=true;SS.sub='cards';viewStaff()},inbox:viewInbox,dups:viewDups,divide:viewDivide,rep:()=>{RP.only=false;viewReports()},busrep:()=>{RP.only=true;RP.sub='bus';viewReports()},prn:()=>{RP.only=true;RP.sub='prn';viewReports()},routes:viewRoutes,bulk:viewBulk,settings:viewSettings,phones:viewPhones,clist:viewClist,tasks:viewTasks,village:viewVillage,vreq:viewVreq,idreq:viewIdreq,due:viewDue,pwrm:viewPw,rolls:viewRolls,gall:viewGall,cnts:viewCnts,myc:viewMyc,vwise:viewVwise,gender:viewGender,design:viewDesign,bus:viewBus})[tab]();updBack()}
 
 // ================= Student list =================
 function flagOf(sid,kind){return Object.entries(S.flags).find(([id,f])=>f.sid===sid&&f.kind===kind&&f.by===S.me.id)}
@@ -1095,7 +1099,7 @@ const DZ={scope:'',d:null,sig:false};
 function dzTarget(){return DZ.scope||'*'}
 function dzLoad(){const sc=dzTarget();const sample=sc==='*'?'5 - A':(sc.includes(' - ')?sc:sc+' - A');DZ.d=JSON.parse(JSON.stringify(sc==='*'?normDesign((S.meta.design||{}).master):designFor(sample)))}
 function dzSample(){const sc=dzTarget();const cls=sc==='*'?'5 - A':(sc.includes(' - ')?sc:sc+' - A');const real=allStudents().find(s=>sc==='*'?true:(s.cls===cls||baseOf(s.cls)===sc));
- return real?Object.assign({},real,{spec:real.spec||'S-1024',mother:real.mother||'Mother Name'}):{name:'Sample Student Name',cls,roll:'12',id:'RIS-26-0001',sr:'1234',adm:'2024-06-01',father:'Sample Father Name',mother:'Sample Mother',contact:'9XXXXXXXXX',village:'KHARSAN',route1:'Route 1',stop1:'Kharsan',route2:'Route 4',stop2:'Gogunda',spec:'S-1024'}}
+ return real?Object.assign({},real,{_r2:1,spec:real.spec||'S-1024',mother:real.mother||'Mother Name'}):{name:'Sample Student Name',cls,roll:'12',id:'RIS-26-0001',sr:'1234',adm:'2024-06-01',father:'Sample Father Name',mother:'Sample Mother',contact:'9XXXXXXXXX',village:'KHARSAN',route1:'Route 1',stop1:'Kharsan',route2:'Route 4',stop2:'Gogunda',_r2:1,spec:'S-1024'}}
 async function saveDesign(patch){const cur=S.meta.design||{};const d=Object.assign({},cur,patch);if(JSON.stringify(d).length>800000)throw{code:'invalid_argument'};await save(()=>S.db.doc('meta/design').set(d));S.meta.design=d;dzc.src=null;refresh()}
 function viewDesign(){const v=$('#view');if(!DZ.d)dzLoad();const dz=S.meta.design||{},ov=dz.over||{};const D=DZ.d;const sc=dzTarget();
  const bases=baseList(),has=k=>!!ov[k];
@@ -1155,19 +1159,19 @@ ${WINGS.map(([k,l])=>`<div style="padding:6px 0;border-bottom:1px solid var(--li
  v.querySelectorAll('[data-rr]').forEach(i=>i.onchange=()=>{D.rows.find(r=>r.k==='rollid')[i.dataset.rr]=i.checked;pv()});
  const mv=(i,d)=>{const r=D.rows.splice(i,1)[0];D.rows.splice(i+d,0,r);viewDesign()};v.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>mv(+b.dataset.up,-1));v.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>mv(+b.dataset.dn,1));
  g('dz_save').onclick=async()=>{try{const cur=S.meta.design||{};if(sc==='*')await saveDesign({master:D});else await saveDesign({over:Object.assign({},cur.over,{[sc]:D})});logHist('design',{},'Card design saved for '+(sc==='*'?'all classes':sc));toast('Design saved ✔');viewDesign()}catch(e){toast(errMsg(e),6000)}};
- if(g('dz_reset'))g('dz_reset').onclick=()=>ask('Go back to the standard design for '+(sc==='*'?'all classes':sc)+'?',async()=>{try{const cur=S.meta.design||{};if(sc==='*'){const d=Object.assign({},cur);delete d.master;await save(()=>S.db.doc('meta/design').set(d));S.meta.design=d}else{const o=Object.assign({},cur.over);delete o[sc];await saveDesign({over:o})}dzc.src=null;dzLoad();toast('Done ✔');viewDesign()}catch(e){toast(errMsg(e),6000)}},'Reset');
+ if(g('dz_reset'))g('dz_reset').onclick=()=>ask('Go back to the standard design for '+(sc==='*'?'all classes':sc)+'?',async()=>{try{const cur=S.meta.design||{};const prevD=JSON.parse(JSON.stringify(cur));if(sc==='*'){const d=Object.assign({},cur);delete d.master;await save(()=>S.db.doc('meta/design').set(d));S.meta.design=d}else{const o=Object.assign({},cur.over);delete o[sc];await saveDesign({over:o})}dzc.src=null;dzLoad();viewDesign();undoToast('Design reset',async()=>{try{await save(()=>S.db.doc('meta/design').set(prevD));S.meta.design=prevD;dzc.src=null;dzLoad();viewDesign();toast('Design restored ✔')}catch(e){toast(errMsg(e),6000)}},10000)}catch(e){toast(errMsg(e),6000)}},'Reset');
  const colSave=async c=>{try{await saveDesign({colors:c});toast('Colours saved ✔');viewDesign()}catch(e){toast(errMsg(e),6000)}};
  v.querySelectorAll('[data-wb],[data-wn],[data-rt]').forEach(i=>i.oninput=()=>{i.dataset.ch='1'});
  g('cl_save').onclick=()=>{const c=JSON.parse(JSON.stringify(colorsCfg()));c.wing=c.wing||{};c.routes=c.routes||{};v.querySelectorAll('[data-wb]').forEach(i=>{if(i.dataset.ch){(c.wing[i.dataset.wb]=c.wing[i.dataset.wb]||{}).bg=i.value}});v.querySelectorAll('[data-wn]').forEach(i=>{if(i.dataset.ch){(c.wing[i.dataset.wn]=c.wing[i.dataset.wn]||{}).band=i.value}});v.querySelectorAll('[data-rt]').forEach(i=>{if(i.dataset.ch)c.routes[i.dataset.rt]=i.value});colSave(c)};
  v.querySelectorAll('[data-wx]').forEach(b=>b.onclick=()=>{const c=JSON.parse(JSON.stringify(colorsCfg()));if(c.wing)delete c.wing[b.dataset.wx];colSave(c)});
- g('cl_reset').onclick=()=>ask('Go back to the standard colours for all wings and bus routes?',()=>colSave({}),'Yes')}
+ g('cl_reset').onclick=()=>ask('Go back to the standard colours for all wings and bus routes?',async()=>{const prevC=JSON.parse(JSON.stringify(colorsCfg()));await colSave({});undoToast('Colours reset',()=>colSave(prevC),10000)},'Yes')}
 
 // ================= v4: staff ID cards =================
-const DESIGS=['Teacher','Driver','Conductor','Peon','Helper','Office Staff','Accountant','PTI (Physical Instructor)','Principal','Other'];
+const DESIGS=['Teacher','Driver','Conductor','Attendant','Peon','Helper','Office Staff','Accountant','Inspector','PTI (Physical Instructor)','Principal','Other'];
 const desigOf=s=>s.desig||(s.cat==='teacher'?'Teacher':s.cat==='principal'?'Principal':s.cat==='office'?'Office Staff':'');
 const empNo=id=>'STF-'+String(id).replace(/^st_/,'').toUpperCase();
 const STD_CAT={teacher:['TEACHER IDENTITY CARD','#1f5c4a','#123a2f'],driver:['BUS STAFF IDENTITY CARD','#8a5a00','#5c3c00'],peon:['SUPPORT STAFF IDENTITY CARD','#5b3a7a','#3b2450'],office:['OFFICE STAFF IDENTITY CARD','#1d4e89','#12335c'],pti:['PHYSICAL INSTRUCTOR ID CARD','#a23b1c','#6e2711'],other:['STAFF IDENTITY CARD','#3c4a63','#26303f']};
-const stCat=s=>{const d=desigOf(s)||catLabel(s.cat);return /driver|conductor/i.test(d)?'driver':/peon|helper/i.test(d)?'peon':/office|accountant/i.test(d)?'office':/pti|physical/i.test(d)?'pti':/teacher/i.test(d)?'teacher':'other'};
+const stCat=s=>{const d=desigOf(s)||catLabel(s.cat);return /driver|conductor|attendant/i.test(d)?'driver':/peon|helper/i.test(d)?'peon':/office|accountant|inspector/i.test(d)?'office':/pti|physical/i.test(d)?'pti':/teacher/i.test(d)?'teacher':'other'};
 function staffCardHTML(id,s,photo){const D=designFor('5 - A'),cc=STD_CAT[stCat(s)]||STD_CAT.other,c=[cc[1],cc[2]],set=S.settings;const bn=(()=>{try{return (busDoc().buses||{})[routeNum(s.route)]||''}catch(e){return''}})();const cell=(l,v)=>`<div class="c"><b>${esc(l)}:</b><span>${esc(v||'-')}</span></div>`;const rw=x=>`<div class="rw" style="margin-bottom:${D.gap}px">${x}</div>`;
  return `<div class="idc" style="background:#eef3f8"><img class="wm" src="${EMB}"><div class="lg"><img src="${LOGO}"></div><div class="band" style="background:${c[0]}"><b>${cc[0]}</b><span>Session ${esc(set.session||'')}</span></div>
 <div class="ph" style="border-color:${c[0]};width:${D.photo}px;height:${D.photo}px">${photo?`<img src="${photo}">`:'<span>PHOTO</span>'}</div><div class="nm" style="font-size:${nameSize(s.name)}px">${esc(s.name)}</div><div class="cl">${esc(desigOf(s)||catLabel(s.cat))}</div>
@@ -1472,7 +1476,7 @@ ${lower?`<div class="box"><b>${lower} children have a village name that is not i
  $('#vm_a').onclick=async()=>{const n=vu($('#vm_n').value);if(!n)return;try{await addVillages([n]);re()}catch(e){toast(errMsg(e),6000)}};
  if($('#vm_f'))$('#vm_f').onclick=async()=>{try{await addVillages(found);re()}catch(e){toast(errMsg(e),6000)}};
  if($('#vm_u'))$('#vm_u').onclick=()=>ask('Make every child\'s village name CAPITAL?',async()=>{const ed={};allStudents(true).forEach(s=>{if(s.village&&s.village!==vu(s.village))ed[s.id]={village:vu(s.village)}});busy('Saving…');try{await applyVillageEdits(ed,'Make villages CAPITAL');unbusy();toast('Done ✔');re()}catch(e){unbusy();toast(errMsg(e),6000)}},'Yes');
- sh.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{try{await setVillages(m.filter(x=>x!==b.dataset.del));re()}catch(e){toast(errMsg(e),6000)}})}
+ sh.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{try{const prevV=m.slice(),nm=b.dataset.del;await setVillages(m.filter(x=>x!==nm));re();undoToast('Village removed from list: '+nm,async()=>{try{await setVillages(prevV);toast('Village restored ✔');re()}catch(e){toast(errMsg(e),6000)}},10000)}catch(e){toast(errMsg(e),6000)}})}
 // ---------- admin: village requests ----------
 function viewVreq(){const v=$('#view');const arr=Object.entries(S.vreq).sort((a,b)=>a[1].at-b[1].at);const when=t=>new Date(t).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
  const rt=r=>r==='NB'?'No bus':(r?(/^\d+$/.test(r)?'Route '+r:r):'—');
@@ -1872,11 +1876,11 @@ ${sec('Boys',B)}${sec('Girls',G)}${sec('Gender not set',N)}
 const CL={by:'cls',cls:'',cat:'',rte:'',gen:'',sel:null};
 function viewCnts(){const v=$('#view'),all=allStudents();const cl=[...new Set(all.map(s=>s.cls))].sort(cmpClass);
  let L=all.filter(s=>(!CL.cls||s.cls===CL.cls)&&(!CL.cat||(CL.cat==='none'?!s.cat2:s.cat2===CL.cat))&&(!CL.rte||(CL.rte==='y'?!!s.rte:!s.rte))&&(!CL.gen||(CL.gen==='none'?!s.gender:s.gender===CL.gen)));
- const K={cls:s=>s.cls,village:s=>vu(s.village)||'(not set)',route:s=>s.nobus?'No bus':(routeNum(s.route1)?'Route '+routeNum(s.route1):'(not set)'),cat:s=>s.cat2||'Not set',gender:s=>s.gender==='F'?'Girls':s.gender==='M'?'Boys':'Not set',rte:s=>s.rte?'RTE':'Non-RTE',adm:s=>admYear(s)?sessLabel(admYear(s)):'(no date)'};
+ const K={cls:s=>s.cls,village:s=>vu(s.village)||'(not set)',route:s=>s.nobus?'No bus':(routeNum(s.route1)?'Route '+routeNum(s.route1):'(not set)'),cat:s=>s.cat2||'Not set',gender:s=>s.gender==='F'?'Girls':s.gender==='M'?'Boys':'Not set',rte:s=>s.rte?'RTE':'Non-RTE',dist:s=>{const n=String(s.native||'').trim();return !n?'District not entered':/udaipur|उदयपुर/i.test(n)?'Udaipur':'Outside Udaipur — '+n.toUpperCase()},adm:s=>admYear(s)?sessLabel(admYear(s)):'(no date)'};
  const by={};L.forEach(s=>{const k=K[CL.by](s);(by[k]=by[k]||[]).push(s)});const ks=Object.keys(by).sort((a,b)=>CL.by==='cls'?cmpClass(a,b):CL.by==='route'?(parseInt(a.slice(6),10)||999)-(parseInt(b.slice(6),10)||999):a.localeCompare(b));
  const opt=(a,cur)=>a.map(x=>`<option value="${esc(x[0])}" ${x[0]===cur?'selected':''}>${esc(x[1])}</option>`).join('');
  v.innerHTML=`<h2>Counts & lists</h2><p class="muted small">Choose how to group the children. Tap any number to see those children with their details.</p>
-<div class="box"><label class="f" style="margin-top:0">Group by</label><select id="cl_by">${opt([['cls','Class / section'],['village','Village'],['route','Bus route'],['cat','Category'],['gender','Boys / Girls'],['rte','RTE / Non-RTE'],['adm','Admission session']],CL.by)}</select>
+<div class="box"><label class="f" style="margin-top:0">Group by</label><select id="cl_by">${opt([['cls','Class / section'],['village','Village'],['route','Bus route'],['cat','Category'],['gender','Boys / Girls'],['rte','RTE / Non-RTE'],['dist','District (Native District field)'],['adm','Admission session']],CL.by)}</select>
 <div class="row" style="margin-top:8px"><select id="cl_c" class="grow"><option value="">All classes</option>${cl.map(c=>`<option ${c===CL.cls?'selected':''}>${esc(c)}</option>`).join('')}</select><select id="cl_k" class="grow"><option value="">All categories</option>${opt(CATS2.map(c=>[c,c]).concat([['none','Not set']]),CL.cat)}</select></div>
 <div class="row" style="margin-top:8px"><select id="cl_r" class="grow">${opt([['','RTE + Non-RTE'],['y','Only RTE'],['n','Only Non-RTE']],CL.rte)}</select><select id="cl_g" class="grow">${opt([['','Boys + Girls'],['M','Only boys'],['F','Only girls'],['none','Gender not set']],CL.gen)}</select></div></div>
 <div class="box"><div class="row"><b class="grow">Grand total</b><button class="btn sm" data-cs="*">${L.length}</button></div>${ks.map((k,i)=>`<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><span class="sn">${i+1}.</span><span class="grow">${esc(k)}</span><button class="btn ${CL.sel===k?'':'sec'} sm" data-cs="${esc(k)}">${by[k].length}</button></div>`).join('')||'<p class="muted small">No child.</p>'}</div>
@@ -1980,7 +1984,7 @@ function openPair(key){const p=[...DP.res.red,...DP.res.yellow].find(x=>x.key===
  const done=()=>{closeSheet();viewDups()};
  $('#px').onclick=$('#px2').onclick=closeSheet;$('#de').onclick=()=>doubleEntry(A,B,key);
  $('#kA').onclick=()=>{DP.plan[key]={act:'keep',keep:p.a,drop:p.b};done()};$('#kB').onclick=()=>{DP.plan[key]={act:'keep',keep:p.b,drop:p.a};done()};$('#bt').onclick=()=>{DP.plan[key]={act:'both'};done()}}
-async function applyPlan(){const items=Object.entries(DP.plan);busy('Applying…');const ok=[...((S.meta.dupok&&S.meta.dupok.k)||[])];let merged=0;
+async function applyPlan(){const items=Object.entries(DP.plan);busy('Applying…');BULK.ids=[];const ok=[...((S.meta.dupok&&S.meta.dupok.k)||[])];let merged=0;
  try{for(let i=0;i<items.length;i++){busyP(`${i+1} / ${items.length}`,i/items.length);const [key,pl]=items[i];
    if(pl.act==='both'){ok.push(key);continue}
    const A=byRef(pl.keep),B=byRef(pl.drop);if(!A||!B)continue;const n=Object.assign({},A);STF.forEach(f=>{if(!n[f]&&B[f])n[f]=B[f]});
@@ -1988,7 +1992,7 @@ async function applyPlan(){const items=Object.entries(DP.plan);busy('Applying…
     if(B.rte&&!A.rte){const d={v:1,at:Date.now()};await save(()=>S.db.doc('rte/'+A.id).set(d));S.rte[A.id]=d}}
    await saveStudent(n,A);const B2=byRef(pl.drop);if(B2)await delStudent(B2,true);merged++}
   if(ok.length!==((S.meta.dupok&&S.meta.dupok.k)||[]).length){const d={k:[...new Set(ok)]};await enqueue(()=>S.db.doc('meta/dupok').set(d));S.meta.dupok=d}
-  DP.plan={};unbusy();toast(`Done ✔ — ${merged} pair(s) merged.`);renderAll(true)}catch(e){unbusy();toast(errMsg(e),7000)}}
+  DP.plan={};unbusy();toast(`Done ✔ — ${merged} pair(s) merged.`);renderAll(true);bulkEnd('Duplicates merged')}catch(e){unbusy();toast(errMsg(e),7000);bulkEnd('Duplicates merged')}}
 
 // ================= Bulk photo upload (match by file name) =================
 const BK={cls:'',mode:'roll',items:[],unmatched:[],nofile:[]};
@@ -2117,19 +2121,21 @@ const tblHTML=(H,rows,boldLast)=>`<div class="scr"><table class="t"><tr>${H.map(
 function exportTableDialog(title,sheets){const d=$('#dlg');d.hidden=false;d.innerHTML=`<div><b>Export: ${esc(title)}</b><div class="row" style="margin-top:10px"><button class="btn grow" id="et_x">Excel</button><button class="btn grow" id="et_p">PDF</button></div><div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn sec" id="et_c">Close</button></div></div>`;
  $('#et_c').onclick=unbusy;$('#et_x').onclick=async()=>{unbusy();try{await lib('XLSX');const wb=XLSX.utils.book_new();sheets.forEach(([n,H,rows])=>{const ws=XLSX.utils.aoa_to_sheet([H,...rows]);ws['!cols']=H.map(()=>({wch:16}));XLSX.utils.book_append_sheet(wb,ws,String(n).slice(0,30))});await dl('RIS_'+title.replace(/[^A-Za-z0-9]+/g,'_')+'.xlsx',XLSX.write(wb,{bookType:'xlsx',type:'array'}))}catch(e){toast('Excel could not be created')}};
  $('#et_p').onclick=async()=>{unbusy();if(sheets.length===1)return mkTablePdf(title,sheets[0][1],sheets[0][2].map(r=>r.map(x=>x==null?'':String(x))));const w=sheets.reduce((a,x)=>x[1].length>a[1].length?x:a,sheets[0]),rows=[];sheets.forEach(([n,h,r],k)=>{if(k)rows.push(h.map(()=>''));rows.push(['== '+n+' =='].concat(h.slice(1).map(()=>'')));rows.push(h);r.forEach(x=>rows.push(x))});await mkTablePdf(title,w[1].map((x,i)=>i?'':'Table'),rows.map(r=>r.map(x=>x==null?'':String(x))))}}
-// ---------- Contact List (RIS format, editable before PDF) ----------
-const CLF={rows:25};
+// ---------- Contact List (RIS format, editable before PDF; filters; multi-page) ----------
+const CLF={rows:25,rows2:30};
 function clSplit(cls){const m=String(cls||'').match(/^(.*?)\s*-\s*([A-Za-z0-9]{1,2})$/);return m?{c:m[1],s:m[2]}:{c:String(cls||''),s:''}}
-function clPageHTML(d,pg,N,blank){const per=CLF.rows,start=pg*per,E=blank?'':'';const rows=[];
- for(let i=0;i<per;i++){const r=d.rows[start+i];const n=start+i+1;
-  rows.push(`<tr><td class="n">${n}</td>${[0,1,2,3,4,5].map(k=>`<td contenteditable="true" data-r="${start+i}" data-k="${k}">${r&&!blank?esc(r[k]||''):''}</td>`).join('')}</tr>`)}
+function clCols(d){return d.multi?8:7}
+function clPageCount(n,d){const p=CLF.rows,p2=CLF.rows2;return Math.max(1,1+Math.ceil(Math.max(0,n-p)/p2))}
+function clPageHTML(d,pg,N,blank){const per=CLF.rows,per2=CLF.rows2,first=pg===0,cnt=first?per:per2,start=first?0:per+(pg-1)*per2,M=!!d.multi,rh=first?(745/per):(985/per2);
+ const rows=[];for(let i=0;i<cnt;i++){const gi=start+i,r=d.rows[gi];const cells=[];
+  if(M)cells.push(`<td contenteditable="true" data-r="${gi}" data-k="6">${r&&!blank?esc(r[6]||''):''}</td>`);
+  [0,1,2,3,4,5].forEach(k=>cells.push(`<td contenteditable="true" data-r="${gi}" data-k="${k}">${r&&!blank?esc(r[k]||''):''}</td>`));
+  rows.push(`<tr><td class="n">${gi+1}</td>${cells.join('')}</tr>`)}
  const ed=(k,v,w)=>`<span class="ln" contenteditable="true" data-h="${k}" style="min-width:${w}px">${esc(v||'')}</span>`;
- return `<div class="clp"><div class="cl-top"><img src="${LOGO}" alt=""></div>
-<div class="cl-ttl"><i></i><b>CONTACT LIST</b><i></i></div>
-<div class="cl-info"><span>Class : ${ed('c',d.c,70)}</span><span>Section : ${ed('s',d.s,70)}</span><span>Class Teacher : ${ed('t',d.t,150)}</span><span>Session : ${ed('y',d.y,90)}</span></div>
-<table class="cl-t" style="--rh:${(745/per).toFixed(2)}px"><thead><tr><th style="width:44px">S.No.</th><th>Name</th><th>Father's Name</th><th>Village</th><th>Contact No. 1<small>(Parent)</small></th><th>Contact No. 2<small>(Parent)</small></th><th>Contact No. 3<small>(Other / Emergency)</small></th></tr></thead><tbody>${rows.join('')}</tbody></table>
-<div class="cl-ft"><i></i><b>An Educational Revolution</b><i></i></div>${N>1?`<div class="cl-pg">Page ${pg+1} / ${N}</div>`:''}</div>`}
-const CL_CSS=`.clp{width:794px;height:1123px;box-sizing:border-box;background:#fff;color:#0d2a73;padding:22px 28px;font-family:Hind,'Noto Sans Devanagari',Mangal,Arial,sans-serif;position:relative;overflow:hidden}
+ const head=first?`<div class="cl-top"><img src="${LOGO}" alt=""></div><div class="cl-ttl"><i></i><b>${esc(d.title||'CONTACT LIST')}</b><i></i></div><div class="cl-info"><span>Class : ${ed('c',d.c,70)}</span><span>Section : ${ed('s',d.s,70)}</span><span>Class Teacher : ${ed('t',d.t,150)}</span><span>Session : ${ed('y',d.y,90)}</span></div>`:'';
+ const th=`<thead><tr><th style="width:44px">S.No.</th>${M?'<th style="width:62px">Class</th>':''}<th>Name</th><th>Father's Name</th><th>Village</th><th>Contact No. 1<small>(Parent)</small></th><th>Contact No. 2<small>(Parent)</small></th><th>Contact No. 3<small>(Other / Emergency)</small></th></tr></thead>`;
+ return `<div class="clp${first?'':' clc'}">${head}<table class="cl-t" style="--rh:${rh.toFixed(2)}px">${th}<tbody>${rows.join('')}</tbody></table><div class="cl-ft"><i></i><b>An Educational Revolution</b><i></i></div>${N>1?`<div class="cl-pg">Page ${pg+1} / ${N}</div>`:''}</div>`}
+const CL_CSS=`.clp{width:794px;height:1123px;box-sizing:border-box;background:#fff;color:#0d2a73;padding:22px 28px;font-family:Hind,'Noto Sans Devanagari',Mangal,Arial,sans-serif;position:relative;overflow:hidden}.clp.clc{padding-top:26px}
 .clp *{box-sizing:border-box}.cl-top{text-align:center}.cl-top img{width:590px;height:auto;display:inline-block}
 .cl-ttl{display:flex;align-items:center;gap:14px;margin:8px 0 10px}.cl-ttl i{flex:1;height:3px;border-top:1px solid #1d56b0;border-bottom:1px solid #1d56b0}.cl-ttl b{background:#1d56b0;color:#fff;border-radius:22px;padding:6px 46px;font-size:24px;letter-spacing:1px;font-family:Arial,sans-serif}
 .cl-info{display:flex;justify-content:space-between;flex-wrap:nowrap;align-items:flex-end;border:1.5px solid #1d56b0;border-radius:10px;background:#eaf2fc;padding:8px 12px;margin-bottom:10px;font:bold 13px Arial,sans-serif;white-space:nowrap}
@@ -2140,28 +2146,111 @@ const CL_CSS=`.clp{width:794px;height:1123px;box-sizing:border-box;background:#f
 .cl-t td.n{text-align:center;font:bold 12.5px Arial,sans-serif;color:#0d2a73}.cl-t th:last-child,.cl-t td:last-child{border-right:0}
 .cl-ft{position:absolute;left:28px;right:28px;bottom:26px;display:flex;align-items:center;gap:14px}.cl-ft i{flex:1;border-top:1px solid #1d56b0;border-bottom:1px solid #1d56b0;height:3px}.cl-ft b{font:italic bold 20px Arial,sans-serif;color:#1d56b0}
 .cl-pg{position:absolute;right:30px;bottom:6px;font:11px Arial;color:#555}`;
-function contactListForm(cls,blank){
- const list=sortStudents(allStudents().filter(s=>s.cls===cls));const sp=clSplit(cls);
- const tch=Object.values(S.staff||{}).filter(x=>x&&x.cat==='teacher'&&(x.classes||[]).includes(cls)).map(x=>x.name).join(', ');
- const d={c:sp.c,s:sp.s,t:tch,y:String((S.settings&&S.settings.session)||''),rows:list.map(s=>[s.name||'',s.father||'',vu(s.village||''),s.contact||'',s.contact2||'',''].map(x=>String(x))).map(r=>[r[0],r[1],r[2],r[3],r[4],r[5]])};
- // table columns: 0 name,1 father,2 village,3 c1,4 c2,5 c3
- const N=Math.max(1,Math.ceil((blank?0:d.rows.length)/CLF.rows));
+// filters: o={cls:'' (class name or base class), sec:'', rte:''|'y'|'n'}
+function clStudents(o){let l=allStudents().filter(s=>canTouch(s));
+ if(o.cls)l=l.filter(s=>s.cls===o.cls||baseOf(s.cls)===o.cls);
+ if(o.sec)l=l.filter(s=>clSplit(s.cls).s===o.sec);
+ if(o.rte==='y')l=l.filter(s=>s.rte);else if(o.rte==='n')l=l.filter(s=>!s.rte);
+ const seen=new Set();l=l.filter(s=>{const k=s.id;if(seen.has(k))return false;seen.add(k);return true});
+ return l.sort((a,b)=>cmpClass(a.cls,b.cls)||String(a.name).localeCompare(String(b.name),'en',{sensitivity:'base'}))}
+function clData(o){const list=clStudents(o);const single=o.cls&&list.length&&list.every(s=>s.cls===list[0].cls);const sp=single?clSplit(list[0].cls):null;
+ const tch=single?Object.values(S.staff||{}).filter(x=>x&&x.cat==='teacher'&&(x.classes||[]).includes(list[0].cls)).map(x=>x.name).join(', '):'';
+ const tag=o.rte==='y'?' — RTE':o.rte==='n'?' — NON-RTE':'';
+ const d={title:'CONTACT LIST'+tag,multi:!single,c:single?sp.c:(o.cls||'All classes'),s:single?sp.s:(o.sec||'All'),t:tch,y:String((S.settings&&S.settings.session)||''),
+  rows:list.map(s=>[s.name||'',s.father||'',vu(s.village||''),s.contact||'',s.contact2||'','',single?'':(s.cls||'')].map(String))};
+ return d}
+function clOverlay(d,blank,reopen){
+ const N=()=>clPageCount(blank?0:d.rows.length,d);
  const ov=document.createElement('div');ov.id='cl_ov';ov.style.cssText='position:fixed;inset:0;z-index:9999;background:#e9edf4;overflow:auto;-webkit-overflow-scrolling:touch';
- const render=()=>{const w=Math.min(window.innerWidth-16,794),z=w/794;ov.innerHTML=`<style>${CL_CSS}.clw{margin:8px auto;box-shadow:0 1px 8px #0004;width:${w}px;height:${1123*z}px;overflow:hidden}.clw .clp{transform:scale(${z});transform-origin:0 0}.clbar{position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid #ccd;padding:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font:14px system-ui}.clbar button{font:inherit;padding:9px 12px;border:0;border-radius:9px;background:#1d56b0;color:#fff}.clbar button.s{background:#6b7a99}</style>
-<div class="clbar"><button id="cl_pdf">📄 PDF / Print</button><button class="s" id="cl_bl">${blank?'Fill with students':'Blank form'}</button><label>Rows/page <select id="cl_rp"><option>20</option><option>25</option><option>30</option></select></label><button class="s" id="cl_x">✕ Close</button><span style="flex-basis:100%;font-size:12px;color:#456">Tap any cell or the Class / Teacher / Session line to edit it. Edits here are only for this printout — student data is not changed.</span></div>`+
-  Array.from({length:N},(_,p)=>`<div class="clw">${clPageHTML(d,p,N,blank)}</div>`).join('');
+ const render=()=>{const n=N(),w=Math.min(window.innerWidth-16,794),z=w/794;ov.innerHTML=`<style>${CL_CSS}.clw{margin:8px auto;box-shadow:0 1px 8px #0004;width:${w}px;height:${1123*z}px;overflow:hidden}.clw .clp{transform:scale(${z});transform-origin:0 0}.clbar{position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid #ccd;padding:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font:14px system-ui}.clbar button{font:inherit;padding:9px 12px;border:0;border-radius:9px;background:#1d56b0;color:#fff}.clbar button.s{background:#6b7a99}</style>
+<div class="clbar"><button id="cl_pdf">⬇ Download PDF</button><button id="cl_pr">🖨 Print</button><button class="s" id="cl_bl">${blank?'Fill with students':'Blank form'}</button><label>Rows/page <select id="cl_rp"><option>20</option><option>25</option><option>30</option></select></label><button class="s" id="cl_x">✕ Close</button><span style="flex-basis:100%;font-size:12px;color:#456">${blank?'Blank form':d.rows.length+' student(s)'} · ${n} page(s). Tap any cell or the Class / Teacher / Session line to edit it. Edits here are only for this printout — student data is not changed.</span></div>`+
+  Array.from({length:n},(_,p)=>`<div class="clw">${clPageHTML(d,p,n,blank)}</div>`).join('');
   ov.querySelector('#cl_rp').value=String(CLF.rows);
-  ov.querySelectorAll('[data-h]').forEach(e=>e.oninput=()=>{d[e.dataset.h]=e.textContent.trim();ov.querySelectorAll(`[data-h="${e.dataset.h}"]`).forEach(o=>{if(o!==e)o.textContent=e.textContent})});
-  ov.querySelectorAll('td[data-k]').forEach(e=>{e.oninput=()=>{const r=+e.dataset.r,k=+e.dataset.k;while(d.rows.length<=r)d.rows.push(['','','','','','']);d.rows[r][k]=e.textContent}});
+  ov.querySelectorAll('[data-h]').forEach(e=>e.oninput=()=>{d[e.dataset.h]=e.textContent.trim()});
+  ov.querySelectorAll('td[data-k]').forEach(e=>{e.oninput=()=>{const r=+e.dataset.r,k=+e.dataset.k;while(d.rows.length<=r)d.rows.push(['','','','','','','']);d.rows[r][k]=e.textContent}});
   ov.querySelector('#cl_x').onclick=()=>ov.remove();
-  ov.querySelector('#cl_bl').onclick=()=>{ov.remove();contactListForm(cls,!blank)};
-  ov.querySelector('#cl_rp').onchange=e=>{CLF.rows=+e.target.value;ov.remove();contactListForm(cls,blank)};
-  ov.querySelector('#cl_pdf').onclick=()=>clPdf(d,N,blank)};
+  ov.querySelector('#cl_bl').onclick=()=>{blank=!blank;render()};
+  ov.querySelector('#cl_rp').onchange=e=>{CLF.rows=+e.target.value;render()};
+  ov.querySelector('#cl_pdf').onclick=()=>clPdf(d,N(),blank);
+  ov.querySelector('#cl_pr').onclick=()=>clPrint(d,N(),blank)};
  document.body.appendChild(ov);render()}
+function contactListForm(cls,blank){clOverlay(clData({cls}),!!blank)}
 async function clPdf(d,N,blank){busy('Creating PDF…');let host;try{await lib('jspdf');await lib('html2canvas');
  const pdf=new jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'});host=document.createElement('div');host.style.cssText='position:fixed;left:-99999px;top:0;width:794px;background:#fff';document.body.appendChild(host);
  for(let p=0;p<N;p++){busyP(`${p+1} / ${N}`,p/N);host.innerHTML=`<style>${CL_CSS}</style>`+clPageHTML(d,p,N,blank);const cv=await html2canvas(host,{scale:2,backgroundColor:'#fff',logging:false});if(p)pdf.addPage();pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297)}
- const blob=pdf.output('blob');unbusy();await deliver('RIS_Contact_List_'+String((d.c+'_'+d.s)).replace(/[^A-Za-z0-9]+/g,'_')+'.pdf',blob)}catch(e){unbusy();toast('PDF could not be created: '+(e&&e.message||e))}finally{if(host)host.remove()}}
+ const blob=pdf.output('blob');unbusy();await deliver('RIS_Contact_List_'+String((d.c+'_'+d.s+(/RTE/.test(d.title)?'_'+d.title.replace(/[^A-Za-z-]+/g,''):''))).replace(/[^A-Za-z0-9]+/g,'_')+'.pdf',blob)}catch(e){unbusy();toast('PDF could not be created: '+(e&&e.message||e))}finally{if(host)host.remove()}}
+function clPrint(d,N,blank){const f=document.createElement('iframe');f.style.cssText='position:fixed;left:-9999px;width:0;height:0;border:0';document.body.appendChild(f);const doc=f.contentWindow.document;
+ doc.open();doc.write(`<!doctype html><meta charset="utf-8"><title>Contact List</title><style>@page{size:A4;margin:0}body{margin:0}${CL_CSS}.clp{page-break-after:always;transform-origin:0 0}</style>`+Array.from({length:N},(_,p)=>clPageHTML(d,p,N,blank)).join(''));doc.close();
+ setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){toast('Printing is not available here; use Download PDF.',5000)}setTimeout(()=>f.remove(),60000)},700)}
+// ----- Contact List tab -----
+const CLT={cls:'',sec:'',rte:''};
+function viewClist(){const v=$('#view');const all=allStudents().filter(canTouch);const bases=[...new Set(all.map(s=>baseOf(s.cls)))].sort(cmpClass);const secs=[...new Set(all.filter(s=>!CLT.cls||baseOf(s.cls)===CLT.cls||s.cls===CLT.cls).map(s=>clSplit(s.cls).s).filter(Boolean))].sort();
+ if(CLT.sec&&!secs.includes(CLT.sec))CLT.sec='';
+ const list=clStudents(CLT),by={};list.forEach(s=>by[s.cls]=(by[s.cls]||0)+1);const pages=clPageCount(list.length,{});
+ const o=(a,c)=>a.map(x=>`<option value="${esc(x[0])}" ${x[0]===c?'selected':''}>${esc(x[1])}</option>`).join('');
+ v.innerHTML=`<h2>Contact List</h2><p class="muted small">Choose what to print. The list uses the RIS contact-list format (A4). You can edit any cell before printing.</p>
+<div class="box"><label class="f" style="margin-top:0">Class</label><select id="clt_c"><option value="">All classes (whole school)</option>${bases.map(b=>`<option ${b===CLT.cls?'selected':''} value="${esc(b)}">${esc(b)}</option>`).join('')}</select>
+<label class="f">Section</label><select id="clt_s"><option value="">All sections</option>${secs.map(x=>`<option ${x===CLT.sec?'selected':''}>${esc(x)}</option>`).join('')}</select>
+<label class="f">RTE status</label><select id="clt_r">${o([['','RTE + Non-RTE'],['y','Only RTE'],['n','Only Non-RTE']],CLT.rte)}</select>
+<div class="row" style="margin-top:10px"><b class="grow">Students in this list: ${list.length}</b><span class="muted small">${pages} page(s)</span></div>
+<div class="small muted" style="margin-top:4px">${Object.keys(by).sort(cmpClass).slice(0,60).map(k=>esc(k)+': '+by[k]).join(' · ')||'No students match.'}</div>
+<div class="row" style="margin-top:10px"><button class="btn grow" id="clt_p" ${list.length?'':'disabled'}>👁 Preview / edit</button><button class="btn grow" id="clt_d" ${list.length?'':'disabled'}>⬇ Download PDF</button></div>
+<div class="row" style="margin-top:6px"><button class="btn sec grow" id="clt_pr" ${list.length?'':'disabled'}>🖨 Print all (this filter)</button><button class="btn sec grow" id="clt_b">Blank form</button></div></div>`;
+ $('#clt_c').onchange=e=>{CLT.cls=e.target.value;viewClist()};$('#clt_s').onchange=e=>{CLT.sec=e.target.value;viewClist()};$('#clt_r').onchange=e=>{CLT.rte=e.target.value;viewClist()};
+ $('#clt_p').onclick=()=>clOverlay(clData(CLT),false);$('#clt_d').onclick=()=>{const d=clData(CLT);clPdf(d,clPageCount(d.rows.length,d),false)};$('#clt_pr').onclick=()=>{const d=clData(CLT);clPrint(d,clPageCount(d.rows.length,d),false)};
+ $('#clt_b').onclick=()=>clOverlay(clData(CLT),true)}
+// ================= Tasks: Accountant Tasks (admin -> accountant) and My To-Do (admin private) =================
+const TK={tab:'at',f:'',done:false};
+const TPRI=['Normal','Important','Urgent'],TST=['Pending','In Progress','Completed','Clarification Required'];
+const tkIsAcct=()=>!!(S.me&&S.me.cat==='acct')&&!isAdmin();
+const tkOver=t=>!!t.due&&t.due<today()&&!['Completed','Cancelled'].includes(t.status);
+const tkNewId=()=>'k_'+Date.now().toString(36)+rnd(4,'abcdefghijklmnopqrstuvwxyz0123456789');
+const tkPriCls=p=>p==='Urgent'?'r':p==='Important'?'y':'';
+const tkFmt=t=>t?new Date(t).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+function tkBadge(){try{const L=tkList('at');return tkIsAcct()?L.filter(t=>!['Completed','Cancelled'].includes(t.status)).length:L.filter(t=>t.status==='Clarification Required'||tkOver(t)).length}catch(e){return 0}}
+function tkAvail(){return isAdmin()||(S.me&&S.me.cat==='acct')}
+function tkList(kind){const src=kind==='at'?S.atask:S.todo;return Object.entries(src||{}).map(([id,t])=>Object.assign({id},t)).filter(t=>kind==='at'||t.owner===(S.me&&S.me.id)).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')||(b.at||0)-(a.at||0))}
+function tkCounts(L){const c={Pending:0,'In Progress':0,Completed:0,'Clarification Required':0,Overdue:0,Cancelled:0};L.forEach(t=>{if(c[t.status]!==undefined)c[t.status]++;if(tkOver(t))c.Overdue++});return c}
+function tkMatch(t,f){return !f||(f==='Overdue'?tkOver(t):t.status===f)}
+function viewTasks(){const v=$('#view');if(!tkAvail()){v.innerHTML='<p class="muted">Not available.</p>';return}
+ const acct=tkIsAcct();if(acct)TK.tab='at';const kind=TK.tab,L=tkList(kind),C=tkCounts(L);
+ const chips=(kind==='at'?['Pending','In Progress','Clarification Required','Completed','Overdue']:['Pending','In Progress','Completed','Overdue']).map(k=>{const n=C[k],bad=k==='Overdue'||k==='Clarification Required';return `<button class="btn sm ${TK.f===k?'':'sec'}" data-tf="${k}"><span class="${n?(k==='Completed'?'ok':bad?'bad':''):''}" style="font-weight:700">${n}</span> ${k==='Clarification Required'?'Clarify':k}</button>`}).join('');
+ let rows=L.filter(t=>tkMatch(t,TK.f));if(kind==='td'&&!TK.f)rows=rows.filter(t=>TK.done?t.status==='Completed':t.status!=='Completed');
+ const card=t=>{const hist=(t.hist||[]).slice(-3).map(h=>`${esc(h.st)}${h.note?' — '+esc(h.note):''} · ${tkFmt(h.at)}${h.by?' · '+esc(h.by):''}`).join('<br>');
+  const stSel=`<select data-ts="${esc(t.id)}">${(kind==='at'&&isAdmin()?TST.concat(['Cancelled']):TST).map(s=>`<option ${t.status===s?'selected':''}>${s}</option>`).join('')}</select>`;
+  return `<div class="box" style="margin:8px 0"><div class="row"><b class="grow">${esc(t.title)}</b><span class="pill ${tkPriCls(t.pri)}">${esc(t.pri||'Normal')}</span></div>
+${t.ins?`<div class="small" style="margin:4px 0;white-space:pre-wrap">${esc(t.ins)}</div>`:''}
+<div class="small muted">${t.due?'Due '+esc(fmtDate(t.due)):'No due date'}${tkOver(t)?' · <b class="bad">Overdue</b>':''}${t.doneAt?' · Completed '+tkFmt(t.doneAt):''}</div>
+<div class="row" style="margin-top:6px;gap:6px">${stSel}<input type="text" data-tn="${esc(t.id)}" placeholder="${acct?'Note for admin (optional)':'Note (optional)'}" class="grow" style="min-width:120px"><button class="btn sm" data-tsv="${esc(t.id)}">Save status</button></div>
+${hist?`<div class="small muted" style="margin-top:6px">${hist}</div>`:''}
+${acct?'':`<div class="row" style="margin-top:6px"><button class="btn sec sm" data-te="${esc(t.id)}">✏ Edit</button><button class="btn sec sm" data-td="${esc(t.id)}">🗑 Delete</button></div>`}</div>`};
+ v.innerHTML=`<h2>${acct?'My tasks':'Tasks'}</h2>${acct?'':`<div class="seg" style="margin:6px 0"><button data-tt="at" class="${kind==='at'?'on':''}">Accountant tasks</button><button data-tt="td" class="${kind==='td'?'on':''}">My To-Do (private)</button></div>`}
+<p class="muted small">${kind==='td'?'Only you can see these tasks. They never appear in the accountant\'s list.':acct?'Tasks given to you by the admin. Update the status as you work; the admin sees it at once.':'Tasks you give to the accountant. The accountant sees them in My tasks after they are saved.'}</p>
+<div class="row" style="flex-wrap:wrap;gap:6px">${chips}${TK.f?'<button class="btn sec sm" data-tf="">Show all</button>':''}</div>
+${acct?'':`<div class="row" style="margin-top:8px"><button class="btn grow" id="tk_new">+ New ${kind==='at'?'task for accountant':'personal task'}</button>${kind==='td'&&!TK.f?`<button class="btn sec" id="tk_h">${TK.done?'Show open':'Completed history'}</button>`:''}</div>`}
+${rows.length?rows.map(card).join(''):`<p class="muted" style="margin-top:12px">${TK.f?'No tasks in this group.':'No tasks yet.'}</p>`}`;
+ v.querySelectorAll('[data-tf]').forEach(b=>b.onclick=()=>{TK.f=b.dataset.tf;viewTasks()});v.querySelectorAll('[data-tt]').forEach(b=>b.onclick=()=>{TK.tab=b.dataset.tt;TK.f='';TK.done=false;viewTasks()});
+ if($('#tk_new'))$('#tk_new').onclick=()=>tkForm(kind,null);if($('#tk_h'))$('#tk_h').onclick=()=>{TK.done=!TK.done;viewTasks()};
+ v.querySelectorAll('[data-te]').forEach(b=>b.onclick=()=>tkForm(kind,b.dataset.te));
+ v.querySelectorAll('[data-tsv]').forEach(b=>b.onclick=()=>tkStatus(kind,b.dataset.tsv,v.querySelector(`[data-ts="${b.dataset.tsv}"]`).value,v.querySelector(`[data-tn="${b.dataset.tsv}"]`).value.trim(),b));
+ v.querySelectorAll('[data-td]').forEach(b=>b.onclick=()=>{const t=(kind==='at'?S.atask:S.todo)[b.dataset.td];if(!t)return;choose(`Delete task "${esc(t.title)}"? You can undo for a few seconds.`,[{t:'Delete',f:()=>delUndo({kind:'task',label:t.title,items:[(kind==='at'?'atask/':'todo/')+b.dataset.td],cache:[[kind==='at'?'atask':'todo',b.dataset.td]],after:viewTasks})},{t:'Cancel',c:'sec'}])})}
+async function tkStatus(kind,id,st,note,btn){const col=kind==='at'?'atask':'todo',t=(kind==='at'?S.atask:S.todo)[id];if(!t)return;if(st===t.status&&!note)return toast('Nothing changed.');
+ if(st==='Clarification Required'&&!note)return toast('Please write what you need clarified.',4000);
+ if(btn)btn.disabled=true;const now=Date.now();const hist=(t.hist||[]).concat([{st,note,at:now,by:S.me.name||S.me.id}]).slice(-30);
+ const upd={status:st,hist,upd:now,doneAt:st==='Completed'?now:0};
+ try{await save(()=>S.db.doc(col+'/'+id).update(upd));(kind==='at'?S.atask:S.todo)[id]=Object.assign({},t,upd);toast('Saved ✔');logHist('task',{cls:''},'Task "'+t.title+'" → '+st);viewTasks()}catch(e){if(btn)btn.disabled=false;toast(errMsg(e),6000)}}
+function tkForm(kind,id){const cur=id?(kind==='at'?S.atask:S.todo)[id]:null,d=$('#dlg');d.hidden=false;
+ d.innerHTML=`<div style="max-height:85vh;overflow:auto"><b>${cur?'Edit':'New'} ${kind==='at'?'accountant task':'personal task'}</b>
+<label class="f">Task title</label><input type="text" id="tk_t" value="${esc(cur?cur.title:'')}" maxlength="150">
+<label class="f">Instructions (optional)</label><textarea id="tk_i" rows="3" maxlength="1500">${esc(cur?(cur.ins||''):'')}</textarea>
+<label class="f">Priority</label><select id="tk_p">${TPRI.map(p=>`<option ${(cur?cur.pri:'Normal')===p?'selected':''}>${p}</option>`).join('')}</select>
+<label class="f">Due date (optional)</label><input type="date" id="tk_d" value="${esc(cur&&cur.due||'')}">
+<div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn sec" id="tk_c">Cancel</button><button class="btn" id="tk_s">Save</button></div></div>`;
+ $('#tk_c').onclick=unbusy;
+ $('#tk_s').onclick=async()=>{const title=$('#tk_t').value.trim();if(!title)return toast('Please write the task title.');const b=$('#tk_s');if(b.disabled)return;b.disabled=true;
+  const col=kind==='at'?'atask':'todo',now=Date.now(),base=cur?Object.assign({},cur):{status:'Pending',at:now,by:S.me.id,byName:S.me.name||'',hist:[{st:'Pending',note:'Task created',at:now,by:S.me.name||S.me.id}],doneAt:0};
+  const doc=Object.assign(base,{title,ins:$('#tk_i').value.trim(),pri:$('#tk_p').value,due:$('#tk_d').value||'',upd:now});if(kind==='td')doc.owner=S.me.id;const tid=id||tkNewId();
+  try{await save(()=>S.db.doc(col+'/'+tid).set(doc));(kind==='at'?S.atask:S.todo)[tid]=doc;unbusy();toast('Saved ✔');logHist('task',{cls:''},(cur?'Task edited: ':'Task added: ')+title);viewTasks()}catch(e){b.disabled=false;toast(errMsg(e),6000)}}}
 // ---------- statistics ----------
 function statsData(){const all=allStudents();const cls=[...new Set(all.map(s=>s.cls))].sort(cmpClass);const G=s=>s.gender==='F'?1:s.gender==='M'?0:2;const CT=CATS2.concat(['Not set']);const Ci=s=>{const i=CATS2.indexOf(s.cat2);return i<0?CATS2.length:i};
  const cnt=(arr,f,n)=>{const a=Array(n).fill(0);arr.forEach(s=>a[f(s)]++);return a};const tot=a=>a.reduce((x,y)=>x+y,0);
