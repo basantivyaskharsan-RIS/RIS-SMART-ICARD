@@ -698,8 +698,8 @@ const DELBUSY=new Set();
 async function delUndo(o){const key=o.items[0];if(DELBUSY.has(key))return;DELBUSY.add(key);
  try{const items=[];for(const path of o.items){const sn=await S.db.doc(path).get();if(sn.exists)items.push({path,data:sn.data()})}
   if(!items.length)throw{message:'Nothing to delete (already removed).'};
-  const id=cleanId('t_'+Date.now().toString(36)+'_'+key.replace(/[^A-Za-z0-9]/g,'').slice(-12)),td={kind:o.kind,label:o.label,items,cache:o.cache||[],by:S.me.id,byName:S.me.name||'',at:Date.now()};
-  await enqueue(()=>S.db.doc('trash/'+id).set(td));
+  const id=cleanId('t_'+Date.now().toString(36)+'_'+key.replace(/[^A-Za-z0-9]/g,'').slice(-12)),td={kind:o.kind,label:o.label,items,cache:(o.cache||[]).map(x=>Array.isArray(x)?x.join('|'):x),by:S.me.id,byName:S.me.name||'',at:Date.now()};
+  try{await enqueue(()=>S.db.doc('trash/'+id).set(td))}catch(e){if(!(e&&e.code==='invalid_argument'))throw e;td.items=items.map(it=>({path:it.path,dj:JSON.stringify(it.data)}));await enqueue(()=>S.db.doc('trash/'+id).set(td))} // Firestore refuses nested arrays: fall back to JSON text
   for(const it of items)await enqueue(()=>S.db.doc(it.path).delete());
   (o.cache||[]).forEach(([b,k])=>{if(S[b])delete S[b][k]});
   logHist('delete',{},o.kind+': '+o.label+' (kept in Trash)');
@@ -707,8 +707,9 @@ async function delUndo(o){const key=o.items[0];if(DELBUSY.has(key))return;DELBUS
   undoToast('Deleted: '+o.label,()=>trashRestore(id),8000)}
  finally{DELBUSY.delete(key)}}
 async function trashRestore(id){const sn=await S.db.doc('trash/'+id).get();if(!sn.exists)throw{message:'Already restored or removed.'};const td=sn.data();
+ td.items.forEach(it=>{if(it.data===undefined&&it.dj)it.data=JSON.parse(it.dj)});
  for(const it of td.items){const ex=await S.db.doc(it.path).get();if(!ex.exists)await enqueue(()=>S.db.doc(it.path).set(it.data))}
- (td.cache||[]).forEach(([b,k])=>{const it=td.items[0];if(S[b]&&it&&it.path.endsWith('/'+k))S[b][k]=it.data});
+ (td.cache||[]).map(x=>Array.isArray(x)?x:String(x).split('|')).forEach(([b,k])=>{const it=td.items[0];if(S[b]&&it&&it.path.endsWith('/'+k))S[b][k]=it.data});
  await enqueue(()=>S.db.doc('trash/'+id).delete());logHist('restore',{},td.kind+': '+td.label+' (restored from Trash)');renderAll(true)}
 
 async function binStudent(st){if(/^DEMO-/.test(st.id))return;const ph=S.thumbs[st.id]?await fullPhoto(st.id):null;const d={s:pack(st),cls:st.cls,ckey:st.ckey,at:Date.now(),by:(S.me&&S.me.name)||'',th:(S.thumbs[st.id]||{}).d||'',ph:ph||'',rte:st.rte?1:0,dob:(S.priv[st.id]||{}).dob||''};if(JSON.stringify(d).length>900000)d.ph='';const bid=cleanId(st.id+'_'+d.at);await enqueue(()=>S.db.doc('bin/'+bid).set(d));return bid}
