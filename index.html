@@ -527,11 +527,20 @@ const rnd=(n,al)=>{const a=new Uint32Array(n);try{crypto.getRandomValues(a)}catc
 function deliver(filename,blob){return new Promise(res=>{const type=blob.type||(/\.pdf$/i.test(filename)?'application/pdf':/\.zip$/i.test(filename)?'application/zip':/\.png$/i.test(filename)?'image/png':'application/octet-stream');
  const file=new File([blob],filename,{type});let canShare=false;try{canShare=!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}))}catch(e){}
  const d=$('#dlg');d.hidden=false;
- d.innerHTML=`<div><b>File ready ✔</b><p class="small" style="margin:6px 0 10px;overflow-wrap:anywhere">${esc(filename)} · ${(blob.size/1048576).toFixed(1)} MB</p><div class="row">${canShare?'<button class="btn grow" id="dv_sh">↗ Share (WhatsApp etc.)</button>':''}<button class="btn ${canShare?'sec ':''}grow" id="dv_sv">💾 Save</button></div>${canShare?'':'<p class="muted small" style="margin:8px 0 0">Direct sharing is not available in this browser/phone — tap "Save", then open WhatsApp and attach this file.</p>'}<div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn sec" id="dv_x">Close</button></div></div>`;
+ d.innerHTML=`<div><b>File ready ✔</b><p class="small" style="margin:6px 0 10px;overflow-wrap:anywhere">${esc(filename)} · ${(blob.size/1048576).toFixed(1)} MB</p>
+<div class="row"><button class="btn grow" id="dv_wa" style="background:#1f9d55">📲 WhatsApp</button><button class="btn grow" id="dv_em" style="background:#1d56b0">✉ Email</button></div>
+<div class="row" style="margin-top:6px"><button class="btn sec grow" id="dv_sv">💾 Save</button>${canShare?'<button class="btn sec grow" id="dv_sh">↗ Other apps</button>':''}</div>
+<p class="muted small" style="margin:8px 0 0">${canShare?'WhatsApp / Email open your phone\'s share list with this file attached — choose WhatsApp or Gmail there.':'This phone cannot attach files directly: the file is saved first, then WhatsApp / Email opens — attach the saved file there.'}</p>
+<div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn sec" id="dv_x">Close</button></div></div>`;
  const close=()=>{unbusy();res()};$('#dv_x').onclick=close;
  $('#dv_sv').onclick=async()=>{await dl(filename,blob);close()};
- if(canShare)$('#dv_sh').onclick=async()=>{try{await navigator.share({files:[file],title:filename});close()}catch(e){if(e&&e.name==='AbortError'){return}
-   unbusy();toast('Direct sharing did not work here — saving the file; after saving, open WhatsApp and attach it.',6000);await dl(filename,blob);res()}}})}
+ const send=async(kind)=>{const title=filename.replace(/\.[a-z0-9]+$/i,'').replace(/_/g,' '),text='Radiant International School, Kharsan — '+title;
+  if(canShare){try{await navigator.share({files:[file],title,text});close();return}catch(e){if(e&&e.name==='AbortError')return}}
+  try{await dl(filename,blob)}catch(e){}
+  toast('File saved. Now attach it in '+(kind==='wa'?'WhatsApp':'the email')+'.',6000);
+  setTimeout(()=>{try{location.href=kind==='wa'?'https://wa.me/?text='+encodeURIComponent(text):'mailto:?subject='+encodeURIComponent(title)+'&body='+encodeURIComponent(text+'\n\n(Please attach the saved file: '+filename+')')}catch(e){}},900);close()};
+ $('#dv_wa').onclick=()=>send('wa');$('#dv_em').onclick=()=>send('em');
+ if(canShare)$('#dv_sh').onclick=()=>send('other')})}
 
 // ================= Login, passwords, recovery code =================
 // SHA-256 (WebCrypto when available, plain JS fallback)
@@ -2423,7 +2432,7 @@ ${left.length?'<div class="row" style="margin-top:10px"><button class="btn" id="
 function viewSettings(){const v=$('#view');const s=S.settings;const rts=[...new Set(allStudents().map(x=>x.route1).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'en',{numeric:true}));
  const sample={name:'Sample Student Name',cls:'8 - B',roll:'12',id:'RIS-26-0001',sr:'1234',adm:'2024-06-01',father:'Sample Father Name',contact:'9XXXXXXXXX',village:'Kharsan',route1:'Route 1',route2:'Route 4'};
  const m=S.meta.backup||{};
- v.innerHTML=`<h2>Settings</h2><div class="box"><h3>School details (only admin can change)</h3><label class="f">School name</label><input type="text" id="s_name" value="${esc(s.name)}"><label class="f">Address</label><input type="text" id="s_addr" value="${esc(s.address||'')}"><label class="f">Session</label><input type="text" id="s_session" value="${esc(s.session)}"><label class="f">School contact 1 (left side on card)</label><input type="tel" id="s_phone1" value="${esc(s.phone1)}"><label class="f">School contact 2 (right side on card)</label><input type="tel" id="s_phone2" value="${esc(s.phone2)}">
+ v.innerHTML=`<h2>Settings</h2><p class="small muted" style="margin:0 0 6px">App version: <b>2026-10-25 · fix-trash-v3</b> (if you do not see this line, the old file is still running)</p><div class="box"><h3>School details (only admin can change)</h3><label class="f">School name</label><input type="text" id="s_name" value="${esc(s.name)}"><label class="f">Address</label><input type="text" id="s_addr" value="${esc(s.address||'')}"><label class="f">Session</label><input type="text" id="s_session" value="${esc(s.session)}"><label class="f">School contact 1 (left side on card)</label><input type="tel" id="s_phone1" value="${esc(s.phone1)}"><label class="f">School contact 2 (right side on card)</label><input type="tel" id="s_phone2" value="${esc(s.phone2)}">
 <label class="row small" style="gap:8px;margin-top:14px"><input type="checkbox" id="s_sr" ${s.showSr?'checked':''}> <span><b>Show SR No. on the ID card</b> (with admission year, e.g. 1234/24)</span></label>
 <label class="f">Default colour (band colour for children whose bus route is empty)</label><input type="color" id="s_color" value="${/^#[0-9a-f]{6}$/i.test(s.color||'')?s.color:'#3c4a63'}"><div class="row" style="margin-top:10px"><button class="btn" id="s_save">Save</button></div></div>
 <div class="box"><h3>Backup</h3><p class="small muted">${m.at?`Last backup: ${new Date(m.at).toLocaleString('en-IN')} · After that ${m.chg||0} changes`:'No backup has been taken yet.'} The backup contains all student data and photos — keep the file safe. Staff logins are not part of a backup (they live in Firebase).</p><div class="row"><button class="btn" id="bk_now">Take backup</button><button class="btn sec" id="bk_rs">Restore data from backup file</button></div><p class="muted small" style="margin:6px 0 0">On restore, the file data is merged into the current data (anything not in the file is not deleted).</p></div>
