@@ -514,7 +514,7 @@ function subAll(){clearSubs(unsubs);XL.loaded=new Set();XL.extraTh=new Set();con
  else{const mc=myCls().slice(0,30);if(mc.length)unsubs.push(S.db.collectionIn('thumbs','cls',mc).onSnapshot(sn=>{const ex={};XL.extraTh.forEach(id=>{if(S.thumbs[id])ex[id]=S.thumbs[id]});S.thumbs=ex;sn.docs.forEach(d=>S.thumbs[d.id]=d.data());refresh()},onErr))}
  if(all)unsubs.push(S.db.collection('contacts').onSnapshot(sn=>{S.contacts={};sn.docs.forEach(d=>S.contacts[d.id]=d.data());refresh()},()=>{}));
  if(isAdmin()||(S.me&&S.me.cat==='acct'))unsubs.push(S.db.collection('priv').onSnapshot(sn=>{S.priv={};sn.docs.forEach(d=>S.priv[d.id]=d.data());refresh()},()=>{}));
- ['sib','dupok','design','villages','bus','gok','tasks'].forEach(k=>unsubs.push(S.db.doc('meta/'+k).onSnapshot(sn=>{S.meta[k]=sn.exists?sn.data():null;if(k==='sib'||k==='gok')DP.dirty=true;refresh()},()=>{})));
+ ['sib','dupok','design','villages','bus','gok','tasks','feesys'].forEach(k=>unsubs.push(S.db.doc('meta/'+k).onSnapshot(sn=>{S.meta[k]=sn.exists?sn.data():null;if(k==='sib'||k==='gok')DP.dirty=true;refresh()},()=>{})));
  unsubs.push(S.db.collection('staff').onSnapshot(sn=>{S.staff={};sn.docs.forEach(d=>S.staff[d.id]=d.data());syncMe();refresh()},onErr));
  unsubs.push(S.db.doc('meta/backup').onSnapshot(sn=>{S.meta.backup=sn.exists?sn.data():null;renderBars()},onErr));
  if(isAdmin()){unsubs.push(sc('activity','activity'));unsubs.push(sc('admins','admins'));purgeBin()}}
@@ -744,7 +744,7 @@ async function setRte(id,v,quiet){if((!!(S.rte[id]&&S.rte[id].v===1))===v)return
 function lateOf(c){if(!(c.ok&&c.okAt))return 0;return studentsOf(c.name).filter(s=>{const t=S.thumbs[s.id],r=S.rte[s.id],ci=S.cinfo[s.seatKey];return(t&&t.at>c.okAt)||(r&&r.at>c.okAt)||(ci&&ci.at>c.okAt)}).length}
 
 // ================= Tabs & main render =================
-function navGroups(){const G=navGroups0();if(cvAvail()){const lf={id:'chk',nm:'Check data',n:0};if(isAdmin()){const m=G.find(g=>g.k==='more');if(m)m.leaves.splice(1,0,lf)}else{const t=G.find(g=>g.k==='students');if(t)t.leaves.push(lf)}}if(xcAvail()){const leaf={id:'xcls',nm:'Extra classes',n:0};const m=G.find(g=>g.k==='more');if(m&&isAdmin()){m.leaves.splice(m.leaves.length-2,0,leaf)}else G.push({k:'xcls',ic:'📚',nm:'Extra classes',leaves:[leaf],n:0})}return G}
+function navGroups(){const G=navGroups0();if(fsAllowed()){const lf={id:'feesys',nm:'Fee System',n:0};const m=G.find(g=>g.k==='more');if(m)m.leaves.splice(1,0,lf);else{const a=G.find(g=>g.k==='certs');if(a)a.leaves.push(lf);else G.push({k:'feesys',ic:'💰',nm:'Fee System',leaves:[lf],n:0})}}if(cvAvail()){const lf={id:'chk',nm:'Check data',n:0};if(isAdmin()){const m=G.find(g=>g.k==='more');if(m)m.leaves.splice(1,0,lf)}else{const t=G.find(g=>g.k==='students');if(t)t.leaves.push(lf)}}if(xcAvail()){const leaf={id:'xcls',nm:'Extra classes',n:0};const m=G.find(g=>g.k==='more');if(m&&isAdmin()){m.leaves.splice(m.leaves.length-2,0,leaf)}else G.push({k:'xcls',ic:'📚',nm:'Extra classes',leaves:[leaf],n:0})}return G}
 function navGroups0(){const inb=Object.keys(S.suggest).length+Object.keys(S.flags).length,dp=DP.count||0,vq=Object.keys(S.vreq).length,iq=Object.keys(S.idreq).length,gs=(GCK.list||[]).length,pwn=Object.values(S.pwrm||{}).filter(x=>x.status==='pending').length+(isAdmin()?Object.values(S.pwrm||{}).filter(x=>x.status==='asked').length:0);const L=(id,nm,n)=>({id,nm,n:n||0});const Gp=(k,ic,nm,leaves)=>({k,ic,nm,leaves,n:leaves.reduce((a,l)=>a+l.n,0)});
  if(isAdmin())return[
   Gp('students','🎓','Students',[L('students','List'),L('phones','Phones'),L('clist','Contact List'),L('rolls','Roll & Att. no.'),L('gender','Gender check',gs),L('gall','Gender lists'),L('cnts','Counts & lists'),L('dups','Duplicates',dp),L('pwrm','Remove from portal',pwn),L('divide','Divide sections')]),
@@ -777,7 +777,7 @@ function renderAll(force){renderTop();
  showTabs();renderBars();const v=$('#view');const tab=S.tab;
  if(tab==='students'){if(!v.querySelector('#stuShell')||force)buildStudents();updateList();return}
  if(!force&&typing())return;
- ({classes:viewClasses,staff:()=>{SS.only=false;viewStaff()},staffid:()=>{SS.only=true;SS.sub='cards';viewStaff()},inbox:viewInbox,dups:viewDups,divide:viewDivide,rep:()=>{RP.only=false;viewReports()},busrep:()=>{RP.only=true;RP.sub='bus';viewReports()},prn:()=>{RP.only=true;RP.sub='prn';viewReports()},routes:viewRoutes,bulk:viewBulk,settings:viewSettings,phones:viewPhones,clist:viewClist,tasks:viewTasks,certs:viewCerts,stock:viewStock,xcls:viewXcls,chk:viewCheck,recov:viewRecov,village:viewVillage,vreq:viewVreq,idreq:viewIdreq,due:viewDue,pwrm:viewPw,rolls:viewRolls,gall:viewGall,cnts:viewCnts,myc:viewMyc,vwise:viewVwise,gender:viewGender,design:viewDesign,bus:viewBus})[tab]();updBack()}
+ ({classes:viewClasses,staff:()=>{SS.only=false;viewStaff()},staffid:()=>{SS.only=true;SS.sub='cards';viewStaff()},inbox:viewInbox,dups:viewDups,divide:viewDivide,rep:()=>{RP.only=false;viewReports()},busrep:()=>{RP.only=true;RP.sub='bus';viewReports()},prn:()=>{RP.only=true;RP.sub='prn';viewReports()},routes:viewRoutes,bulk:viewBulk,settings:viewSettings,phones:viewPhones,clist:viewClist,tasks:viewTasks,certs:viewCerts,stock:viewStock,xcls:viewXcls,chk:viewCheck,feesys:viewFeeSys,recov:viewRecov,village:viewVillage,vreq:viewVreq,idreq:viewIdreq,due:viewDue,pwrm:viewPw,rolls:viewRolls,gall:viewGall,cnts:viewCnts,myc:viewMyc,vwise:viewVwise,gender:viewGender,design:viewDesign,bus:viewBus})[tab]();updBack()}
 
 // ================= Student list =================
 function flagOf(sid,kind){return Object.entries(S.flags).find(([id,f])=>f.sid===sid&&f.kind===kind&&f.by===S.me.id)}
@@ -2605,6 +2605,56 @@ function qfix(id){const s=allStudents(true).find(x=>x.id===id);if(!s||!canTouch(
  $('#qf_x').onclick=unbusy;$('#qf_p').onclick=()=>{unbusy();openStudent(id)};$('#qf_s').onclick=async()=>{const b=$('#qf_s');if(b.disabled)return;b.disabled=true;const ok=await cvSave(id);if(ok)unbusy();else b.disabled=false}}
 const qfAdd=()=>{document.querySelectorAll('#view .item[data-id],#dlg .item[data-id]').forEach(it=>{if(it.querySelector('.qfb,.th,input,select,textarea'))return;const id=it.dataset.id;const b=document.createElement('a');b.className='callb qfb';b.href='javascript:void(0)';b.textContent='✏';b.title='Add / correct details';b.style.marginLeft='6px';b.onclick=e=>{e.stopPropagation();e.preventDefault();qfix(id)};it.appendChild(b)})};
 try{new MutationObserver(()=>{clearTimeout(qfAdd.t);qfAdd.t=setTimeout(qfAdd,60)}).observe(document.body,{childList:true,subtree:true})}catch(e){}
+// ================= Fee System link + import preview (reads the separate Fee System; nothing is written until you approve) =================
+const FSY={rows:null,busy:false,msg:''};
+const fsAllowed=()=>isAdmin()||(S.me&&S.me.cat==='acct');
+const fsCfg=()=>S.meta.feesys||{};
+const fsNorm=x=>String(x||'').toLowerCase().replace(/[^a-z0-9ऀ-ॿ ]/g,' ').replace(/\s+/g,' ').trim();
+function viewFeeSys(){const v=$('#view');if(!fsAllowed()){v.innerHTML='<p class="muted">Not available.</p>';return}
+ const c=fsCfg(),url=c.pageUrl||'fees.html';
+ v.innerHTML=`<h2>Fee System</h2><p class="muted small">The fee receipts, dues, admission and survey app that runs on your Google Sheet. It keeps its own records; this screen only opens it and, if you want, compares its student list with this app.</p>
+<div class="box"><button class="btn" id="fs_open">Open Fee System ↗</button><div class="small muted" style="margin-top:6px">Opens: ${esc(url)}</div></div>
+${isAdmin()?`<div class="box"><h3>Settings (admin only)</h3><label class="f">Fee System page address</label><input type="text" id="fs_p" placeholder="fees.html  (or the full web address)" value="${esc(c.pageUrl||'')}">
+<label class="f">Apps Script web address (ends with /exec)</label><input type="text" id="fs_a" value="${esc(c.apiUrl||'')}"><label class="f">ID-card key (from the sheet menu: Fee System → Create ID-card API key)</label><input type="password" id="fs_k" autocomplete="off" placeholder="${c.hasKey?'Saved — type only to replace':'Paste the key'}">
+<p class="small muted">The key is stored in the database where only the admin can read it. It is never in the app file or on GitHub.</p><div class="row"><button class="btn" id="fs_sv">Save settings</button></div></div>
+<div class="box"><h3>Compare students with the Fee System</h3><p class="small muted">Reads the Fee System's student list and shows what matches. <b>Nothing is changed</b> until you tap an Apply button. Only blank boxes (village, mobile, father, mother) are filled; nothing is overwritten and no child is added.</p><div class="row"><button class="btn sec" id="fs_cmp" ${FSY.busy?'disabled':''}>${FSY.busy?'Reading…':'Read and compare'}</button></div>${FSY.msg?`<p class="small ${FSY.rows?'ok':'bad'}" style="margin-top:6px">${esc(FSY.msg)}</p>`:''}</div>`:''}
+<div id="fs_res"></div>`;
+ $('#fs_open').onclick=()=>{try{window.open(url,'_blank','noopener')}catch(e){location.href=url}};
+ if(isAdmin()){$('#fs_sv').onclick=async()=>{const k=$('#fs_k').value.trim(),p=$('#fs_p').value.trim(),a=$('#fs_a').value.trim();if(a&&!/^https:\/\/script\.google\.com\/macros\/s\/[^ ]+\/exec$/.test(a))return toast('The Apps Script address must start with https://script.google.com/macros/s/ and end with /exec.',6000);
+   try{const hasKey=k?true:!!c.hasKey;await save(()=>S.db.doc('meta/feesys').set({pageUrl:p,apiUrl:a,hasKey,at:Date.now()}));if(k)await save(()=>S.db.doc('secret/feesys').set({key:k,at:Date.now()}));S.meta.feesys={pageUrl:p,apiUrl:a,hasKey};toast('Saved ✔');viewFeeSys()}catch(e){toast(errMsg(e),6000)}};
+  $('#fs_cmp').onclick=fsRead}
+ fsPaint()}
+async function fsRead(){const c=fsCfg();if(!c.apiUrl||!c.hasKey){FSY.msg='Save the Apps Script address and the key first.';return viewFeeSys()}
+ FSY.busy=true;FSY.msg='';FSY.rows=null;viewFeeSys();let key='';
+ try{const sn=await S.db.doc('secret/feesys').get();key=sn.exists?sn.data().key:'';if(!key)throw new Error('The key is not saved.');
+  const res=await fetch(c.apiUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:'exportStudents',args:[key]})});const j=await res.json();if(j.err)throw new Error(j.err);if(!Array.isArray(j.ok))throw new Error('Unexpected reply from the Fee System.');
+  FSY.rows=fsMatch(j.ok);FSY.msg='Read '+j.ok.length+' students from the Fee System.'}
+ catch(e){FSY.rows=null;FSY.msg='Could not read the Fee System: '+(e&&e.message?e.message:'no connection')+'. Check the address and that the web app access is "Anyone".'}
+ FSY.busy=false;viewFeeSys()}
+function fsMatch(list){const all=allStudents(),by={};all.forEach(s=>{const k=fsNorm(s.name);(by[k]=by[k]||[]).push(s)});const out={match:[],only:[],used:new Set()};
+ list.forEach(f=>{const cand=(by[fsNorm(f.name)]||[]).filter(s=>!out.used.has(s.id));let s=null;
+  if(cand.length===1)s=cand[0];else if(cand.length>1){const fc=fsNorm(f.cls);s=cand.find(x=>fsNorm(baseOf(x.cls))===fc&&(!f.sec||/ - (\w+)$/.test(x.cls)&&RegExp(' - '+String(f.sec).trim()+'$','i').test(x.cls)))||null}
+  if(!s){out.only.push(f);return}out.used.add(s.id);
+  const ch={},pv=String(f.phone||'').replace(/\D/g,'').slice(-10),fv=vu(f.village||'');
+  if(fv&&!vu(s.village))ch.village=fv;if(/^\d{10}$/.test(pv)&&!/^\d{10}$/.test(mob10(s.contact)))ch.contact=pv;
+  if(f.father&&!s.father)ch.father=tc(f.father);if(f.mother&&!s.mother)ch.mother=tc(f.mother);
+  const dif=[];if(f.father&&s.father&&fsNorm(f.father)!==fsNorm(s.father))dif.push('Father: '+s.father+' ≠ '+f.father);if(fv&&vu(s.village)&&fv!==vu(s.village))dif.push('Village: '+vu(s.village)+' ≠ '+fv);
+  out.match.push({s,f,ch,dif})});
+ out.notInFee=all.filter(s=>!out.used.has(s.id)).length;return out}
+const FSL={village:'Village',contact:'Father mobile',father:'Father',mother:'Mother'};
+function fsPaint(){const h=$('#fs_res');if(!h||!FSY.rows||!isAdmin())return;const R=FSY.rows,fill=R.match.filter(x=>Object.keys(x.ch).length),dif=R.match.filter(x=>x.dif.length);
+ h.innerHTML=`<div class="box"><h3>Result</h3><div class="small">Matched: <b>${R.match.length}</b> · Blanks that can be filled: <b>${fill.length}</b> children · Different values (not touched): <b>${dif.length}</b> · In Fee System only: <b>${R.only.length}</b> · In this app only: <b>${R.notInFee}</b></div>
+${fill.length?`<div class="row" style="margin-top:8px"><button class="btn" id="fs_all">Fill all blanks (${fill.length} children)</button></div>`:''}</div>
+${fill.length?`<div class="box"><h3>Blanks to fill (${fill.length})</h3>${fill.slice(0,100).map((x,i)=>`<div class="row" style="padding:6px 0;border-top:1px solid var(--line);flex-wrap:nowrap"><div class="grow small"><b>${i+1}. ${esc(x.s.name)}</b> · ${esc(x.s.cls)}<br>${Object.entries(x.ch).map(([k,v])=>esc(FSL[k])+': <b>'+esc(v)+'</b>').join(' · ')}</div><button class="btn sm" data-fa="${esc(x.s.id)}">Apply</button></div>`).join('')}${fill.length>100?'<p class="muted small">First 100 shown; "Fill all" covers every child.</p>':''}</div>`:''}
+${dif.length?`<div class="box"><h3>Different in the two apps (${dif.length}) — please check by hand</h3>${dif.slice(0,60).map(x=>`<div class="small" style="padding:4px 0;border-top:1px solid var(--line)"><b>${esc(x.s.name)}</b> · ${esc(x.s.cls)}<br>${x.dif.map(esc).join('<br>')}</div>`).join('')}</div>`:''}
+${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})</h3><p class="small muted">Not found by name here. Not added automatically.</p>${R.only.slice(0,60).map(f=>`<div class="small">${esc(f.name)} · ${esc(f.cls||'')} ${esc(f.sec||'')}${f.adm?' · '+esc(f.adm):''}</div>`).join('')}</div>`:''}`;
+ const apply=async x=>{const s=allStudents().find(z=>z.id===x.s.id);if(!s)return false;const ch=x.ch;try{
+   if(ch.contact){const c0=S.contacts[s.id]||{};const d={f:ch.contact,m:c0.m!==undefined?c0.m:(s.contact2||''),by:S.me.id,at:Date.now()};await cset(s.id,d);S.contacts[s.id]=d}
+   if(ch.village)await setVillageFor(s,ch.village);
+   const rest={};['father','mother'].forEach(k=>{if(ch[k])rest[k]=ch[k]});if(Object.keys(rest).length)await saveStudent(Object.assign({},s,rest),s);
+   logHist('feesys',s,'Blanks filled from Fee System: '+Object.keys(ch).join(', '));return true}catch(e){toast(errMsg(e),6000);return false}};
+ h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
+ if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ---------- statistics ----------
 function statsData(){const all=allStudents();const cls=[...new Set(all.map(s=>s.cls))].sort(cmpClass);const G=s=>s.gender==='F'?1:s.gender==='M'?0:2;const CT=CATS2.concat(['Not set']);const Ci=s=>{const i=CATS2.indexOf(s.cat2);return i<0?CATS2.length:i};
  const cnt=(arr,f,n)=>{const a=Array(n).fill(0);arr.forEach(s=>a[f(s)]++);return a};const tot=a=>a.reduce((x,y)=>x+y,0);
@@ -2776,7 +2826,7 @@ ${left.length?'<div class="row" style="margin-top:10px"><button class="btn" id="
 function viewSettings(){const v=$('#view');const s=S.settings;const rts=[...new Set(allStudents().map(x=>x.route1).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'en',{numeric:true}));
  const sample={name:'Sample Student Name',cls:'8 - B',roll:'12',id:'RIS-26-0001',sr:'1234',adm:'2024-06-01',father:'Sample Father Name',contact:'9XXXXXXXXX',village:'Kharsan',route1:'Route 1',route2:'Route 4'};
  const m=S.meta.backup||{};
- v.innerHTML=`<h2>Settings</h2><p class="small muted" style="margin:0 0 6px">App version: <b>2026-10-25 · quickfix-v7</b> (if you do not see this line, the old file is still running)</p><div class="box"><h3>School details (only admin can change)</h3><label class="f">School name</label><input type="text" id="s_name" value="${esc(s.name)}"><label class="f">Address</label><input type="text" id="s_addr" value="${esc(s.address||'')}"><label class="f">Session</label><input type="text" id="s_session" value="${esc(s.session)}"><label class="f">School contact 1 (left side on card)</label><input type="tel" id="s_phone1" value="${esc(s.phone1)}"><label class="f">School contact 2 (right side on card)</label><input type="tel" id="s_phone2" value="${esc(s.phone2)}">
+ v.innerHTML=`<h2>Settings</h2><p class="small muted" style="margin:0 0 6px">App version: <b>2026-10-25 · feesys-v8</b> (if you do not see this line, the old file is still running)</p><div class="box"><h3>School details (only admin can change)</h3><label class="f">School name</label><input type="text" id="s_name" value="${esc(s.name)}"><label class="f">Address</label><input type="text" id="s_addr" value="${esc(s.address||'')}"><label class="f">Session</label><input type="text" id="s_session" value="${esc(s.session)}"><label class="f">School contact 1 (left side on card)</label><input type="tel" id="s_phone1" value="${esc(s.phone1)}"><label class="f">School contact 2 (right side on card)</label><input type="tel" id="s_phone2" value="${esc(s.phone2)}">
 <label class="row small" style="gap:8px;margin-top:14px"><input type="checkbox" id="s_sr" ${s.showSr?'checked':''}> <span><b>Show SR No. on the ID card</b> (with admission year, e.g. 1234/24)</span></label>
 <label class="f">Default colour (band colour for children whose bus route is empty)</label><input type="color" id="s_color" value="${/^#[0-9a-f]{6}$/i.test(s.color||'')?s.color:'#3c4a63'}"><div class="row" style="margin-top:10px"><button class="btn" id="s_save">Save</button></div></div>
 <div class="box"><h3>Backup</h3><p class="small muted">${m.at?`Last backup: ${new Date(m.at).toLocaleString('en-IN')} · After that ${m.chg||0} changes`:'No backup has been taken yet.'} The backup contains all student data and photos — keep the file safe. Staff logins are not part of a backup (they live in Firebase).</p><div class="row"><button class="btn" id="bk_now">Take backup</button><button class="btn sec" id="bk_rs">Restore data from backup file</button></div><p class="muted small" style="margin:6px 0 0">On restore, the file data is merged into the current data (anything not in the file is not deleted).</p></div>
