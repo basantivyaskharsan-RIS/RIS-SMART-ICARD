@@ -2671,7 +2671,7 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
-const APP_BUILD='due-v15';
+const APP_BUILD='due-v16';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
@@ -3432,6 +3432,11 @@ $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet'&&!document.get
  document.getElementById('tbBack').onclick=()=>history.back();
 })();
 try{if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}
+// slow-start watchdog: if the page is still on "Loading…" after 15 s, say why and offer a fix
+setTimeout(function wd(){try{const v=document.getElementById('view');if(!v||S.me)return;const txt=(v.textContent||'').trim();if(txt!=='Loading…'&&txt!=='Loading...')return;
+ v.innerHTML='<div class="box"><h2>Taking too long…</h2><p>Internet is slow, or the browser has old saved files. Nothing is wrong with your password.</p><p class="small muted">Firebase files: '+(FB?'loaded':'NOT loaded')+' · Login data: '+(S.loginLoaded?'loaded':'NOT loaded')+' · Internet: '+(navigator.onLine===false?'OFF':'on')+'</p><div class="row"><button class="btn grow" id="wd_r">Try again</button></div><div class="row" style="margin-top:8px"><button class="btn sec grow" id="wd_c">Clear saved files and reload</button></div><p class="small muted">If it still does not open: switch between WiFi and mobile data, close other tabs, and check the phone date and time is Automatic.</p></div>';
+ document.getElementById('wd_r').onclick=()=>location.reload();
+ document.getElementById('wd_c').onclick=async()=>{try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}if(navigator.serviceWorker){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()))}}catch(e){}location.reload()}}catch(e){}},15000);
 boot();
 
 </script>
