@@ -1,0 +1,276 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- who is signed in ----------
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+    function adminPath() {
+      return /databases/$(database)/documents/staff/admin;
+    }
+    // the admin is the person whose sign-in e-mail is stored in staff/admin
+    function isMainAdmin() {
+      return signedIn() && exists(adminPath())
+        && get(adminPath()).data.ae == request.auth.token.email;
+    }
+    // a second administrator is listed in admins/{their e-mail}
+    function isAdmin2() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+    function isAdmin() {
+      return isMainAdmin() || isAdmin2();
+    }
+    // staff logins look like  st_abc123.randomtext@ris-staff.example.com  ->  staff id = st_abc123
+    function myId() {
+      return request.auth.token.email.split('@')[0].split('[.]')[0];
+    }
+    function myPath() {
+      return /databases/$(database)/documents/staff/$(myId());
+    }
+    function isStaff() {
+      return isAdmin() || (signedIn() && exists(myPath())
+        && get(myPath()).data.ae == request.auth.token.email);
+    }
+    function myCat() {
+      return isAdmin() ? 'admin' : get(myPath()).data.cat;
+    }
+    // in-charge of extra classes: marked by the admin in the staff record (xin = true)
+    function isXin() {
+      return isStaff() && get(myPath()).data.get('xin', false) == true;
+    }
+    function catIn(list) {
+      return isAdmin() || (isStaff() && myCat() in list);
+    }
+
+    // ---------- public (before login) ----------
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    // names + categories for the login screen (no mobile numbers, no data)
+    match /login/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------- staff ----------
+    match /staff/{id} {
+      allow read: if isStaff();
+      // very first admin can create staff/admin once, using their own sign-in e-mail
+      allow create: if isAdmin()
+        || (id == 'admin' && signedIn() && !exists(adminPath())
+            && request.resource.data.ae == request.auth.token.email
+            && request.resource.data.cat == 'admin');
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.ae == request.auth.token.email
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['temp', 'pwAt']));
+      allow delete: if isAdmin() && id != 'admin';
+    }
+
+    // ---------- school data: everyone logged in may read, only the admin writes ----------
+    match /classes/{id} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+    match /meta/{id} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ---------- things staff may write (same rights as in the app) ----------
+    match /thumbs/{id} {
+      allow read: if isStaff();
+      allow write: if catIn(['teacher', 'office']);
+    }
+    match /photos/{id} {
+      allow read: if isStaff();
+      allow write: if catIn(['teacher', 'office']);
+    }
+    match /rte/{id} {
+      allow read: if isStaff();
+      allow write: if catIn(['acct']);
+    }
+    match /cinfo/{id} {
+      allow read: if isStaff();
+      allow write: if catIn(['teacher']);
+    }
+    match /suggest/{id} {
+      allow read: if isStaff();
+      allow write: if catIn(['teacher', 'office']);
+    }
+    match /flags/{id} {
+      allow read: if isStaff();
+      allow write: if catIn(['teacher']);
+    }
+    match /activity/{id} {
+      allow read: if isStaff();
+      allow write: if isStaff();
+    }
+
+    // mobile numbers: class teachers and office staff may add/change them
+    match /contacts/{id} {
+      allow read: if isStaff();
+      allow write: if catIn(['teacher', 'office', 'acct']);
+    }
+    // date of birth: only admin and accountant
+    match /priv/{id} {
+      allow read, write: if catIn(['acct']);
+    }
+
+    // ---------- NEW: second administrator ----------
+    match /admins/{email} {
+      allow read: if isAdmin() || (signedIn() && email == request.auth.token.email);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (signedIn() && email == request.auth.token.email
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['temp', 'pwAt']));
+    }
+    // ---------- NEW: village / route requests and new ID-card requests from teachers ----------
+    match /vreq/{id} {
+      allow read: if isStaff();
+      allow create, update: if catIn(['teacher', 'office']);
+      allow delete: if isAdmin();
+    }
+    match /idreq/{id} {
+      allow read: if isStaff();
+      allow create, update: if catIn(['teacher', 'office']);
+      allow delete: if isAdmin();
+    }
+    // ---------- NEW: children to be removed from the PSP portal ----------
+    // admin + accountant may add / approve / mark done; teachers and office may only ASK (status 'asked')
+    match /pwrm/{id} {
+      allow read: if isStaff();
+      allow create: if catIn(['acct'])
+        || (catIn(['teacher', 'office']) && request.resource.data.status == 'asked');
+      allow update: if catIn(['acct']);
+      allow delete: if catIn(['acct']);
+    }
+    // ---------- NEW: change history (staff write, only admin reads) ----------
+    match /hist/{id} {
+      allow read: if isAdmin();
+      allow create: if isStaff();
+    }
+    // ---------- NEW: recycle bin and automatic backup (admin only) ----------
+    match /bin/{id} {
+      allow read, write: if isAdmin();
+    }
+    match /bak/{id} {
+      allow read, write: if isAdmin();
+    }
+    // ---------- NEW: trash for every deleted item (admin only; Undo + restore) ----------
+    match /trash/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    // tasks: admin gives tasks to the accountant; the accountant may only change status/notes
+    match /atask/{id} {
+      allow read: if catIn(['acct']);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (catIn(['acct'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'doneAt', 'hist', 'upd']));
+    }
+    // admin's private to-do list
+    match /todo/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    // certificates issued (log) and fee rates: admin and accountant only
+    match /cert/{id} {
+      allow read, create: if catIn(['acct']);
+      allow update, delete: if isAdmin();
+    }
+    match /feerate/{id} {
+      allow read, write: if catIn(['acct']);
+    }
+
+    // stock & orders, and fee recovery for left students: admin and accountant
+    match /stock/{id} {
+      allow read, create, update: if catIn(['acct']);
+      allow delete: if isAdmin();
+    }
+    match /recov/{id} {
+      allow read, create, update: if catIn(['acct']);
+      allow delete: if isAdmin();
+    }
+
+    // extra classes: admin and the in-charge manage; class teachers may only read
+    match /xcls/{id} {
+      allow read: if isAdmin() || isXin() || catIn(['teacher']);
+      allow create, update: if isAdmin() || isXin();
+      allow delete: if isAdmin();
+    }
+    match /xph/{id} {
+      allow read: if isAdmin() || isXin() || catIn(['teacher']);
+      allow create, update: if isAdmin() || isXin();
+      allow delete: if isAdmin();
+    }
+
+    // extra-class change requests: teacher -> in-charge -> admin (only admin gives the final approval)
+    match /xreq/{id} {
+      allow read: if isAdmin() || isXin() || (isStaff() && resource.data.by == myId());
+      allow create: if isAdmin() || (isStaff() && request.resource.data.by == myId()
+                    && request.resource.data.stage in ['Pending incharge', 'Pending admin']);
+      allow update: if isAdmin()
+                    || (isXin() && resource.data.stage == 'Pending incharge'
+                        && request.resource.data.stage in ['Pending admin', 'Rejected']);
+      allow delete: if isAdmin();
+    }
+
+    // transport masters (morning routes, return route names, bus and driver details): admin edits; a flagged transport manager can only read
+    function isTm() {
+      return isStaff() && get(myPath()).data.get('tm', false) == true;
+    }
+    match /tmr/{id} {
+      allow read: if isAdmin() || isTm();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // staff duty chart: admin sees all; a staff member sees only the duties they are listed in
+    match /duty/{id} {
+      allow read: if isAdmin() || (isStaff() && myId() in resource.data.get('who', []));
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isStaff() && myId() in resource.data.get('who', [])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'statusBy', 'hist', 'upd']));
+    }
+    // in-app alerts: sender and receivers only
+    match /dalert/{id} {
+      allow read: if isAdmin() || (isStaff() && (resource.data.by == myId() || myId() in resource.data.get('to', [])));
+      allow create: if isAdmin() || (isStaff() && request.resource.data.by == myId());
+      allow update: if isAdmin() || (isStaff() && (resource.data.by == myId() || myId() in resource.data.get('to', []))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acks', 'hist', 'upd']));
+      allow delete: if isAdmin();
+    }
+    // secret keys (for example the Fee System key): admin only
+    match /secret/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    // survey (children who may join), survey teams and admissions
+    // admin and office staff see everything; any staff member may fill a survey and sees only their own
+    match /survey/{id} {
+      allow read: if catIn(['office']) || (isStaff() && resource.data.by == myId());
+      allow create: if isAdmin() || (isStaff() && request.resource.data.by == myId());
+      allow update, delete: if catIn(['office']) || (isStaff() && resource.data.by == myId());
+    }
+    // the reference person noted in a survey: written by the surveyor, read only by admin and office
+    match /sref/{id} {
+      allow read, update, delete: if catIn(['office']);
+      allow create: if isStaff();
+    }
+    match /steam/{id} {
+      allow read, create: if isStaff();
+      allow update, delete: if catIn(['office']) || (isStaff() && resource.data.by == myId());
+    }
+    match /admission/{id} {
+      allow read, create, update: if catIn(['office']);
+      allow delete: if isAdmin();
+    }
+
+    // everything else is closed
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

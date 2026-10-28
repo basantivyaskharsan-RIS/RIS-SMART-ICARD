@@ -1,5 +1,5 @@
 // RIS offline helper: keeps the app opening even on a weak network.
-const V='ris-v5';
+const V='ris-v6';
 const CORE=['./','index.html','manifest.json','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','favicon-32.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>Promise.all(CORE.map(u=>c.add(u).catch(()=>{})))).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==V).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
@@ -9,7 +9,7 @@ self.addEventListener('fetch',e=>{
   if(/firestore\.googleapis|identitytoolkit|securetoken|googleapis\.com\/(identitytoolkit|v1)/.test(u.host+u.pathname))return;
   const same=u.origin===location.origin;
   const lib=/gstatic\.com|cdnjs\.cloudflare\.com|fonts\.g/.test(u.host);
-  if(same&&(r.mode==='navigate'||/index\.html$|\/$/.test(u.pathname))){
+  if(same&&(r.mode==='navigate'||/index(_old)?\.html$|\/$/.test(u.pathname))){
     // network first for the app page, so a new upload shows up at once
     e.respondWith(fetch(r).then(x=>{const c=x.clone();caches.open(V).then(h=>h.put(r,c));return x}).catch(()=>caches.match(r).then(m=>m||caches.match('index.html'))));
   }else if(same||lib){
