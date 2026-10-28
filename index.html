@@ -352,6 +352,7 @@ const lastWord=n=>{const w=String(n||'').trim().split(/\s+/);return w[w.length-1
 // family links (verified siblings / cousins) -> elder sibling line on small children's cards
 function famMap(){const sd=S.meta.sib||{};if(famMap.src===sd&&famMap.m)return famMap.m;const m={};const add=(keys,rel)=>(keys||[]).forEach(k=>{const ids=String(k).split('+');ids.forEach(a=>ids.forEach(b=>{if(a!==b){m[a]=m[a]||{};if(m[a][b]!=='sib')m[a][b]=rel}}))});add(sd.cous,'cous');add(sd.yes,'sib');famMap.src=sd;famMap.m=m;return m}
 function elderCands(st){const fm=famMap()[st.id];if(!fm)return[];const rk=classRank(st.cls),all=allStudents(),out=[];Object.keys(fm).forEach(id=>{const o=all.find(x=>x.id===id);if(o&&classRank(o.cls)>rk)out.push({o,rel:fm[id]})});return out}
+function sibList(st){if(!st||!st.id||classRank(st.cls)>1)return[];const fm=famMap()[st.id];if(!fm)return[];const all=allStudents(),out=[];Object.keys(fm).forEach(id=>{if(fm[id]!=='sib')return;const o=all.find(x=>x.id===id);if(o&&classRank(o.cls)>=2&&classRank(o.cls)<=10)out.push(o)});return out.sort((a,b)=>classRank(b.cls)-classRank(a.cls)||String(a.name).localeCompare(String(b.name)))}
 function elderInfo(st){if(!st||!st.id||classRank(st.cls)>3)return null;const c=elderCands(st);if(!c.length)return null;let pick=c.find(x=>x.o.id===st.elder);if(!pick){const sb=c.filter(x=>x.rel==='sib'),pool=sb.length?sb:c;if(pool.length===1)pick=pool[0]}
  return pick?{name:pick.o.name,cls:pick.o.cls,rel:pick.rel,id:pick.o.id}:null}
 function cardHTML(st,photo){const D=designFor(st.cls),s=S.settings,c=routeColor(st.route1,st.cls),c2=routeColor(st.route2,st.cls);
@@ -369,12 +370,12 @@ function cardHTML(st,photo){const D=designFor(st.cls),s=S.settings,c=routeColor(
   else if(row.k==='special'){if(st.spec)body+=rw(row,cell(lb||'Special No.',st.spec))}
   else if(row.k==='route1')body+=rw(row,cell2(lb||'Bus Route - Primary -',routeText(st.route1,st.stop1)));
   else if(row.k==='route2'){if(st.route2||st.stop2||st._r2)body+=rw(row,cell2(lb||'Bus Route - Secondary -',routeText(st.route2,st.stop2)))}});
- const el=D.elderOn?elderInfo(st):null;
+ const sbl=D.sibOn===false?[]:sibList(st);const el=D.elderOn&&!sbl.length?elderInfo(st):null;
  const foot=D.footOne?`<div class="ft" data-dzk="foot" style="background:${c2[0]}"><div class="lb">${esc(D.footLabel)}</div><div class="nums1">${[s.phone1,s.phone2].filter(Boolean).map(esc).join(' &nbsp;|&nbsp; ')}</div></div>`:`<div class="ft" data-dzk="foot" style="background:${c2[0]}"><div class="lb">${esc(D.footLabel)}</div><div class="nums"><span>${esc(s.phone1||'')}</span><span>${esc(s.phone2||'')}</span></div></div>`;
  return `<div class="idc" style="background:${classTint(st.cls)}"><img class="wm" src="${EMB}"><div class="lg"><img src="${LOGO}"></div>
 <div class="band" data-dzk="band" style="background:${c[0]}"><b>${esc(D.band)}</b><span>Session ${esc(s.session||'')}</span></div>
 <div class="ph" data-dzk="photo" style="border-color:${c[0]};width:${D.photo}px;height:${D.photo}px">${ph}</div>
-<div class="nm" data-dzk="name" style="font-size:${D.nameSize||nameSize(st.name)}px${D.nameCol&&isHex(D.nameCol)?';color:'+D.nameCol:''}">${nm}</div>${D.fatherSmall&&st.father?`<div class="fs" data-dzk="father"${D.fatherFs?` style="font-size:${D.fatherFs}px"`:''}>Father: ${esc(st.father)}</div>`:''}<div class="cl">Class ${cl}${st.seat&&st.seat!==st.cls?` <span class="seat">(Seating: ${esc(st.seat)})</span>`:''}</div>${floorLine(st)}${el?`<div class="el">Elder ${el.rel==='sib'?'sibling':'cousin'}: ${esc(el.name)} (Class ${esc(el.cls)})</div>`:''}
+<div class="nm" data-dzk="name" style="font-size:${D.nameSize||nameSize(st.name)}px${D.nameCol&&isHex(D.nameCol)?';color:'+D.nameCol:''}">${nm}</div>${D.fatherSmall&&st.father?`<div class="fs" data-dzk="father"${D.fatherFs?` style="font-size:${D.fatherFs}px"`:''}>${D.fatherLabelOn?'Father: ':''}${esc(st.father)}</div>`:''}<div class="cl">Class ${cl}${st.seat&&st.seat!==st.cls?` <span class="seat">(Seating: ${esc(st.seat)})</span>`:''}</div>${floorLine(st)}${sbl.length?`<div class="el" style="font-size:10px;font-weight:700;margin-top:2px">Sibling in the School</div>${sbl.map(o=>`<div class="el" style="font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.name)} | ${esc(o.cls)}${o.village?' | '+esc(vu(o.village)):''}</div>`).join('')}`:''}${el?`<div class="el">Elder ${el.rel==='sib'?'sibling':'cousin'}: ${esc(el.name)} (Class ${esc(el.cls)})</div>`:''}
 ${body}<div class="sg" data-dzk="sig">${D.sigOn?`<img src="${D.sigImg||SIGN}"><span>${esc(D.sigText)}</span>`:''}</div>
 ${foot}</div>`}
 async function fullPhoto(id){const t=S.thumbs[id];if(!t)return null;const c=photoCache[id];if(c&&c.at===t.at)return c.d;
@@ -512,8 +513,10 @@ async function ensureExtras(){if(can('all')||!S.me)return;const need=scopeStuden
   try{const sn=await S.db.doc('contacts/'+s.id).get();if(sn.exists)S.contacts[s.id]=sn.data()}catch(e){}
   if(!mc.has(s.cls)){try{const tn=await S.db.doc('thumbs/'+s.id).get();if(tn.exists){S.thumbs[s.id]=tn.data();XL.extraTh.add(s.id)}}catch(e){}}}))}
  refresh()}
+function rbacOn(){return !!(S.me&&S.me.cat==='teacher'&&!can('all')&&FF('rbac'))}
 function subAll(){clearSubs(unsubs);XL.loaded=new Set();XL.extraTh=new Set();const all=can('all');
- ['classes','rte','cinfo','suggest','flags','vreq','idreq'].forEach(c=>unsubs.push(sc(c,c,c==='classes'?ensureExtras:null)));
+ ['classes','rte','cinfo','suggest','flags','vreq','idreq'].filter(c=>!(c==='classes'&&rbacOn())).forEach(c=>unsubs.push(sc(c,c,c==='classes'?ensureExtras:null)));
+ if(rbacOn()){S.classes={};myCls().forEach(n=>{const k=classKey(n);unsubs.push(S.db.doc('classes/'+k).onSnapshot(sn=>{if(sn.exists)S.classes[k]=sn.data();else delete S.classes[k];ensureExtras();refresh()},onErr))})}
  unsubs.push(S.db.collection('pwrm').onSnapshot(sn=>{S.pwrm={};sn.docs.forEach(d=>S.pwrm[d.id]=d.data());refresh()},()=>{}));
  if(isAdmin()||(S.me&&S.me.cat==='acct'))unsubs.push(S.db.collection('atask').onSnapshot(sn=>{S.atask={};sn.docs.forEach(d=>S.atask[d.id]=d.data());refresh()},()=>{}));
  if(S.me){const pv=isAdmin()||S.me.cat==='office';unsubs.push((pv?S.db.collection('survey'):S.db.collectionIn('survey','by',[S.me.id])).onSnapshot(sn=>{S.survey={};sn.docs.forEach(d=>S.survey[d.id]=d.data());refresh()},()=>{}));unsubs.push(S.db.collection('steam').onSnapshot(sn=>{S.steam={};sn.docs.forEach(d=>S.steam[d.id]=d.data());refresh()},()=>{}));if(pv){unsubs.push(S.db.collection('sref').onSnapshot(sn=>{S.sref={};sn.docs.forEach(d=>S.sref[d.id]=d.data());refresh()},()=>{}));unsubs.push(S.db.collection('admission').onSnapshot(sn=>{S.admn={};sn.docs.forEach(d=>S.admn[d.id]=d.data());refresh()},()=>{}))}}
@@ -2671,7 +2674,7 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
-const APP_BUILD='due-v19';
+const APP_BUILD='due-v22';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
@@ -3090,7 +3093,7 @@ function drRollRows(){const A=allStudents().filter(s=>DRP.cls==='ALL'||s.cls===D
   r.apply=r.kind==='ok'&&r.attSt!=='diff'&&r.rollSt==='new'||r.kind!=='odd'&&r.kind!=='nosec'&&r.attSt==='new'&&r.rollSt!=='diff';out.push(r)})});return out}
 function drSec(t,rows,cols){return `<div class="box"><b>${esc(t)}</b>${rows.length?`<div style="max-height:46vh;overflow:auto;margin-top:6px">${rows.map((r,i)=>`<div class="item" style="display:block"><span class="sn">${i+1}.</span> ${r}</div>`).join('')}</div>`:'<p class="muted small" style="margin:6px 0 0">कुछ नहीं मिला ✔</p>'}</div>`}
 function viewDrep(){const v=$('#view');if(!isAdmin()){v.innerHTML='<div class="box"><p class="muted">केवल एडमिन के लिए।</p></div>';return}
- const tabs=[['roll','Roll number'],['sr','SR / पिता'],['tr','Transport log'],['xc','Extra class']];
+ const tabs=[['roll','Roll number'],['rp','Route pending'],['cc','Class check'],['sr','SR / पिता'],['tr','Transport log'],['xc','Extra class']];
  let body='';
  if(DRP.tab==='roll'){const cl=Object.values(S.classes).map(c=>c.name).sort(cmpClass);const R=drRollRows();const n=(f)=>R.filter(f);const nm=r=>`${esc(r.s.name)} <span class="muted small">(${esc(r.s.cls)}, A–Z क्रम ${r.serial}, अभी Att ${esc(r.ca||'-')}, Roll ${esc(r.cr||'-')})</span>`;
   const attHave=n(r=>r.ca),rollOk=n(r=>r.rollSt==='ok'),newRoll=n(r=>r.rollSt==='new'),diffRoll=n(r=>r.rollSt==='diff'),newAtt=n(r=>r.attSt==='new'),diffAtt=n(r=>r.attSt==='diff'),dA=n(r=>r.dupA),dR=n(r=>r.dupR),nosec=n(r=>r.kind==='nosec'),odd=n(r=>r.kind==='odd'),pre=n(r=>r.kind==='pre'),ap=n(r=>r.apply);
@@ -3101,6 +3104,9 @@ function viewDrep(){const v=$('#view');if(!isAdmin()){v.innerHTML='<div class="b
   +drSec('एडमिन पुष्टि चाहिए — मौजूदा Att सूची-क्रम से अलग',diffAtt.map(r=>nm(r)+' → क्रम '+r.serial+(r.pr?', Roll '+esc(r.pr):'')))
   +drSec('एडमिन पुष्टि चाहिए — मौजूदा Roll प्रस्तावित से अलग',diffRoll.map(r=>nm(r)+' → प्रस्तावित '+esc(r.pr)))
   +drSec('Duplicate Attendance No.',dA.map(nm))+drSec('Duplicate Roll No.',dR.map(nm))+drSec('सेक्शन खाली',nosec.map(nm))+drSec('गलत/अलग बनावट वाला कक्षा-नाम',odd.map(nm))+drSec('Nursery / Jr. KG / Sr. KG (Roll नियम तय नहीं)',pre.map(nm))}
+ else if(DRP.tab==='cc'){const cls=Object.entries(S.classes||{});const bad=cls.filter(([k,c])=>k!==classKey(c.name));const names=new Set(cls.map(([k,c])=>c.name));const miss=[];Object.entries(S.staff).forEach(([i,s])=>{if(s&&s.cat==='teacher')(s.classes||[]).forEach(c=>{if(!names.has(c))miss.push(esc(s.name)+' — '+esc(c))})});
+  body=`<p class="muted small">शिक्षक को सिर्फ़ उसकी कक्षा दिखाने के लिए ऐप हर कक्षा का दस्तावेज़ उसके नाम से खोलता है। नीचे जाँच है कि यह नाम सब कक्षाओं में ठीक बैठता है। केवल जाँच, कुछ नहीं बदलता।</p><div class="box"><p class="small" style="margin:0">कुल कक्षाएँ ${cls.length} · नाम से मेल न खाने वाली ${bad.length} · शिक्षक को दी पर मौजूद नहीं ${miss.length}</p></div>`+drSec('Document-id और कक्षा-नाम मेल नहीं खाते (इन्हें पहले ठीक करना होगा)',bad.map(([k,c])=>esc(c.name)+' → id: '+esc(k)+', अपेक्षित: '+esc(classKey(c.name))))+drSec('शिक्षक को दी गई कक्षा, जो कक्षा-सूची में नहीं है',miss)}
+ else if(DRP.tab==='rp'){body=drRoutePending()}
  else if(DRP.tab==='sr'){const A=allStudents(),by={};A.forEach(s=>{const k=String(s.sr||'').trim();if(k)(by[k]=by[k]||[]).push(s)});const nm=s=>`${esc(s.name)} <span class="muted small">(${esc(s.cls)})</span>`;
   const noSr=A.filter(s=>!String(s.sr||'').trim()),dup=Object.entries(by).filter(([k,a])=>a.length>1);const nf=A.filter(s=>!String(s.father||'').trim());
   body=`<p class="muted small">केवल जाँच। कोई डेटा नहीं बदलता। SR, Scholar Reg. और Student ID को अलग फ़ील्ड माना है।</p><div class="box"><p class="small" style="margin:0">कुल ${A.length} · SR खाली ${noSr.length} · दोहराए SR ${dup.length} · पिता का नाम खाली ${nf.length}</p></div>`
@@ -3117,8 +3123,8 @@ function viewDrep(){const v=$('#view');if(!isAdmin()){v.innerHTML='<div class="b
  if($('#rp_ap'))$('#rp_ap').onclick=()=>{const rows=drRollRows().filter(r=>r.apply);if(!rows.length||DRP.cls==='ALL')return;ask('एडमिन अनुमति: कक्षा '+esc(DRP.cls)+' के '+rows.length+' बच्चों के सिर्फ़ <b>खाली</b> Attendance/Roll भरे जाएँगे। जो पहले से भरा है वह नहीं बदलेगा। 15 से ज़्यादा हों तो पहले अपने-आप Backup बनता है। आगे बढ़ें?',async()=>{busy('भर रहा हूँ…');try{const map={};rows.forEach(r=>{const o={};if(r.attSt==='new')o.att=String(r.serial);if(r.rollSt==='new')o.roll=r.pr;if(Object.keys(o).length)map[r.s.id]=o});await patchStudents(map,'Attendance/Roll numbers filled (admin approved) in class '+DRP.cls+' for '+Object.keys(map).length+' student(s)');unbusy();toast('भर दिए ✔');viewDrep()}catch(e){unbusy();toast(errMsg(e),7000)}},'हाँ, भरें')}}
 
 // ================= v17: feature switches, new header, multi-select, Staff Duty & Transport =================
-const FFD={hdr:1,duty:1,msel:1};
-const FFN={hdr:'New header (bigger logo and buttons)',duty:'Staff Duty & Transport tab',msel:'Select several at once (Extra-class bulk add)'};
+const FFD={hdr:1,duty:1,msel:1,rbac:1};
+const FFN={hdr:'New header (bigger logo and buttons)',duty:'Staff Duty & Transport tab',msel:'Select several at once (Extra-class bulk add)',rbac:'Class teachers open only their own class (needs the new Rules)'};
 const FF=k=>{const f=(S.settings&&S.settings.ff)||{};return f[k]===undefined?!!FFD[k]:!!f[k]};
 (function(){const st=document.createElement('style');st.id='hdr2css';st.textContent=`
 body.hdr2 .top{flex-wrap:wrap;row-gap:8px;padding-block:8px}
@@ -3255,6 +3261,34 @@ function dtAlertForm(keep){if(!keep||!DT.ad)DT.ad={t:DT_AL[0],c:'',m:'',to:[]};c
  $('#al_to').onclick=()=>{snap();msel({title:'Send to',unit:'Staff',pre:o.to,items:SO.map(([i,s])=>({id:i,label:s.name,sub:(s.mobile?mob10(s.mobile)+' · ':'')+(s.desig||catLabel(s.cat))})),okLabel:'Done',onCancel:()=>dtAlertForm(true),onOk:ids=>{o.to=ids;dtAlertForm(true)}})};
  $('#al_x').onclick=()=>{DT.ad=null;unbusy()};
  $('#al_ok').onclick=async()=>{snap();if(!o.m.trim())return toast('Write the message.');if(!o.to.length&&!isAdmin())return toast('Choose who gets this alert.');const b=$('#al_ok');b.disabled=true;try{await dtMkAlert({type:o.t,cls:o.c.trim(),to:o.to,msg:o.m.trim()});const n=o.to.length;DT.ad=null;unbusy();toast('Alert saved ✔ ('+n+' people)');viewDuty()}catch(x){b.disabled=false;toast(errMsg(x),6000)}}}
+
+// ================= v20: Quick Route Change (morning / return separately), Route pending lists =================
+const QRC=['village','vwise','routes','trans','drep','bus','busrep'];
+const qrMorn=()=>Object.entries(S.tmr||{}).filter(([i,r])=>r&&r.kind==='morning'&&r.active!==false).sort((a,b)=>(a[1].order||0)-(b[1].order||0));
+const qrText=(m,rt,st)=>{const r=m?(S.tmr||{})[m]:null;return r?r.name+((r.stops||[]).find(x=>x.id===st)?' / '+(r.stops||[]).find(x=>x.id===st).n:''):'—'};
+function qrChange(sid){const s=allStudents(true).find(x=>x.id===sid);if(!s)return;if(!can('edit'))return toast('Only the admin can change the route.',4000);
+ const d=$('#dlg');d.hidden=false;const nR=routeNums(),MR=qrMorn();const rv=routeVal(s);const retNow=s.nobus?'No bus':(rv?'Route '+rv+(s.stop1?' / '+s.stop1:''):'—');
+ d.innerHTML=`<div style="max-height:90vh;overflow:auto"><b>Change route — ${esc(s.name)}</b><div class="small muted">Class ${esc(s.cls)}${s.village?' · '+esc(vu(s.village)):''}</div>
+ <div class="box" style="margin-top:8px"><label class="row" style="gap:8px"><input type="checkbox" id="qr_mc" style="width:22px;height:22px"><b>Morning route</b></label><div class="small muted">Now: ${esc(qrText(s.mroute,'',s.mstop))}</div><div id="qr_mb" hidden><select id="qr_mr"><option value="">No morning route</option>${MR.map(([i,r])=>`<option value="${esc(i)}" ${i===s.mroute?'selected':''}>${esc(r.name)}</option>`).join('')}</select><select id="qr_ms" style="margin-top:6px"></select></div></div>
+ <div class="box"><label class="row" style="gap:8px"><input type="checkbox" id="qr_rc" style="width:22px;height:22px"><b>Return / primary route</b></label><div class="small muted">Now: ${esc(retNow)}</div><div id="qr_rb" hidden><select id="qr_rr"><option value="">No route</option>${Array.from({length:nR},(_,i)=>String(i+1)).map(n=>`<option value="${n}" ${rv===n?'selected':''}>Route ${n}${rStart(n)?' — '+esc(rStart(n)):''}</option>`).join('')}</select><select id="qr_rs" style="margin-top:6px"></select></div></div>
+ <p class="small muted">Only the ticked part changes. The other route, village, fees and everything else stay as they are.</p><div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn sec" id="qr_x">Cancel</button><button class="btn" id="qr_ok" disabled>Review & save</button></div></div>`;
+ const fillM=()=>{const r=(S.tmr||{})[$('#qr_mr').value];$('#qr_ms').innerHTML='<option value="">Stop…</option>'+((r&&r.stops)||[]).filter(x=>x.active!==false).map(x=>`<option value="${esc(x.id)}" ${x.id===s.mstop&&$('#qr_mr').value===s.mroute?'selected':''}>${esc(x.n)}</option>`).join('');$('#qr_ms').hidden=!r};
+ const fillR=()=>{const L=dueStops($('#qr_rr').value);$('#qr_rs').innerHTML='<option value="">Stop…</option>'+L.map((x,i)=>x.n?`<option value="${i+1}" data-nm="${esc(x.n)}" ${String(s.stopno||'')===String(i+1)&&$('#qr_rr').value===rv?'selected':''}>${i+1}. ${esc(x.n)}</option>`:'').join('');$('#qr_rs').hidden=!$('#qr_rr').value};
+ fillM();fillR();
+ const upd=()=>{$('#qr_mb').hidden=!$('#qr_mc').checked;$('#qr_rb').hidden=!$('#qr_rc').checked;$('#qr_ok').disabled=!($('#qr_mc').checked||$('#qr_rc').checked)};
+ $('#qr_mc').onchange=upd;$('#qr_rc').onchange=upd;$('#qr_mr').onchange=fillM;$('#qr_rr').onchange=fillR;$('#qr_x').onclick=unbusy;
+ $('#qr_ok').onclick=()=>{const upd0={},lines=[];
+  if($('#qr_mc').checked){const m=$('#qr_mr').value,st=m?$('#qr_ms').value:'';if(m&&!st&&$('#qr_ms').options.length>1)return toast('Choose the morning stop.');upd0.mroute=m;upd0.mstop=st;lines.push('Morning: '+qrText(s.mroute,'',s.mstop)+' → '+qrText(m,'',st))}
+  if($('#qr_rc').checked){const r=$('#qr_rr').value,o=$('#qr_rs').selectedOptions[0],sn=r&&o&&o.dataset.nm?o.dataset.nm:'';if(r&&!$('#qr_rs').value&&$('#qr_rs').options.length>1)return toast('Choose the return stop.');upd0.route1=r;upd0.stop1=sn;upd0.stopno=r?$('#qr_rs').value:'';if(s.nobus&&r)upd0.nobus=false;lines.push('Return: '+retNow+' → '+(r?'Route '+r+(sn?' / '+sn:''):'No route'))}
+  ask('<b>'+esc(s.name)+'</b><br>'+lines.map(esc).join('<br>')+'<br><br>Save this change?',async()=>{busy('Saving…');try{await saveStudent(Object.assign({},s,upd0),s);logHist('edit',s,'Route change — '+lines.join('; '));unbusy();toast('Saved ✔');refresh();if(S.tab==='drep')viewDrep()}catch(e){unbusy();toast(errMsg(e),6000)}},'Yes, save')};}
+// a 🚌 button next to ✏ on children in route-related screens (admin only)
+const qrAdd=()=>{if(!S.me||!can('edit'))return;const inScr=QRC.includes(S.tab);document.querySelectorAll((inScr?'#view .item[data-id],':'')+'#dlg .item[data-id]').forEach(it=>{if(it.querySelector('.qrb,.th,input,select,textarea'))return;const id=it.dataset.id;const b=document.createElement('a');b.className='callb qrb';b.href='javascript:void(0)';b.textContent='🚌';b.title='Change route';b.style.marginLeft='6px';b.onclick=e=>{e.stopPropagation();e.preventDefault();qrChange(id)};it.appendChild(b)})};
+try{new MutationObserver(()=>{clearTimeout(qrAdd.t);qrAdd.t=setTimeout(qrAdd,90)}).observe(document.body,{childList:true,subtree:true})}catch(e){}
+// DUE reports: morning and return pending are shown separately
+function drRoutePending(){const A=allStudents();const nm=s=>`<div class="item" data-id="${esc(s.id)}"><div class="grow"><div class="nm">${esc(s.name)}</div><div class="mt">Class ${esc(s.cls)}${s.village?' · '+esc(vu(s.village)):''}</div></div></div>`;
+ const noM=A.filter(s=>!s.mroute||!(S.tmr||{})[s.mroute]),noR=A.filter(s=>!s.nobus&&!routeVal(s)),stopM=A.filter(s=>s.mroute&&(S.tmr||{})[s.mroute]&&!s.mstop),stopR=A.filter(s=>!s.nobus&&routeVal(s)&&!s.stopno&&!s.stop1);
+ const sec=(t,L)=>`<div class="box"><b>${esc(t)} (${L.length})</b>${L.length?`<div style="max-height:44vh;overflow:auto">${L.map(nm).join('')}</div>`:'<p class="muted small" style="margin:6px 0 0">कुछ नहीं मिला ✔</p>'}</div>`;
+ return `<p class="muted small">Morning और Return की स्थिति अलग गिनी गई है। "No bus" वाले बच्चे गिनती में नहीं हैं। 🚌 दबाकर Route चुनें; किसी को अपने-आप Route में नहीं डाला जाता।</p><div class="box"><p class="small" style="margin:0">कुल ${A.length} · Morning route नहीं: <b>${noM.length}</b> · Return route नहीं: <b>${noR.length}</b> · Morning stop खाली: ${stopM.length} · Return stop खाली: ${stopR.length}</p></div>`+sec('Morning route नहीं',noM)+sec('Return route नहीं',noR)+sec('Morning route है, stop खाली',stopM)+sec('Return route है, stop खाली',stopR)}
 
 // ---------- statistics ----------
 function statsData(){const all=allStudents();const cls=[...new Set(all.map(s=>s.cls))].sort(cmpClass);const G=s=>s.gender==='F'?1:s.gender==='M'?0:2;const CT=CATS2.concat(['Not set']);const Ci=s=>{const i=CATS2.indexOf(s.cat2);return i<0?CATS2.length:i};
