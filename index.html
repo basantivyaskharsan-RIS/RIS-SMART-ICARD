@@ -3973,7 +3973,7 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
-const APP_BUILD='due-v66';
+const APP_BUILD='due-v68';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
@@ -4786,11 +4786,11 @@ function drRoutePending(){const A=allStudents();const nm=s=>`<div class="item" d
 const AD={type:'',grp:'pre',draft:null,dirty:false,fresh:'',scope:'all',q:'',one:'',bw:false,st:'pend'};
 const AD_TYPES=[['quarterly','Quarterly'],['half','Half-Yearly'],['yearly','Yearly']];
 const AD_NAME={quarterly:'Quarterly Examination',half:'Half-Yearly Examination',yearly:'Yearly Examination'};
-const AD_GRP=[['pre','Pre-Primary','Nursery · Jr. KG · Sr. KG'],['pri','Primary','Class 1–5'],['sec','Secondary','Class 6–10']];
-const AD_INS='Bring this Admit Card every day.\nReach the school 15 minutes before the exam.\nOnly blue or black pen is allowed.\nMobile phones and calculators are not allowed.';
+const AD_GRP=[['pre','Pre-Primary','Nursery · Jr. KG · Sr. KG'],['pri','Primary','Class 1–4'],['c5','Class 5','Class 5'],['c8','Class 8','Class 8'],['c10','Class 10','Class 10'],['sec','Other Secondary','Class 6, 7, 9']];
+const AD_INS='1. Bring this Admit Card every day.\n2. Reach the school 15 minutes before the exam.\n3. Only blue or black pen is allowed.\n4. Rough sheets will be provided at the center and must be handed back before leaving the hall.\n5. Maintain strict silence; any candidate caught using unfair means will be disqualified immediately.\n6. Electronic gadgets including mobile phones, smartwatches, calculators, and Bluetooth devices are strictly banned.\n7. Bags, books, notebooks, and wallets are not allowed inside the examination hall.\n8. Follow the prescribed dress code: wear simple clothes and avoid large buttons, jewelry, or thick-soled shoes.\n9. No re-examination will be conducted under any circumstances for absentees.';
 const adEx=()=>S.meta.exam||{};
 const adType=()=>AD.type||adEx().cur||'half';
-const adGrpOf=cls=>{const r=classRank(baseOf(cls));return r<1?'pre':r<=5?'pri':'sec'};
+const adGrpOf=cls=>{const r=classRank(baseOf(cls));return r<1?'pre':r<=4?'pri':r===5?'c5':r===8?'c8':r===10?'c10':'sec'};
 function adSaved(t){const T=(adEx().types||{})[t];return T?JSON.parse(JSON.stringify(T)):null}
 function adBlank(t){const g={};AD_GRP.forEach(x=>g[x[0]]={tt:[],ins:AD_INS});return {name:AD_NAME[t],sess:String((S.settings&&S.settings.session)||''),centre:'Radiant International School, Kharsan',groups:g}}
 function adLoad(){const t=adType();let d=adSaved(t);AD.fresh='';
@@ -4813,7 +4813,7 @@ function adSigs(){const D=normDesign((S.meta.design||{}).master);return {pr:D.si
 function adCard(st,t,tight){const g=adGrpOf(st.cls),T=(adEx().types||{})[t]||{},G=((T.groups||{})[g])||{},tt=(G.tt||[]).filter(r=>r.sub),sg=adSigs();const th=S.thumbs[st.id],ph=th&&th.d?`<img src="${th.d}">`:'';
  const rows=tt.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(adDate(r.d))}</td><td>${esc(adDay(r.d))}</td><td>${esc(r.sub)}</td><td>${esc(r.tm||'')}</td><td class="iv"></td></tr>`).join('');
  return `<div class="adc${tight?' tight t3':''}${tt.length>8?' d9':''}"><div class="hd"><img src="${LOGO}"></div><div class="ti">ADMIT CARD</div><div class="ex">${esc(T.name||AD_NAME[t])} · Session ${esc(T.sess||'')}${T.centre?' &nbsp;|&nbsp; Exam Centre: '+esc(T.centre):''}</div>
-<div class="top"><div class="ph">${ph}</div><div class="kv"><div class="w nm">${esc(st.name)}</div><div><b>Father:</b> ${esc(st.father||'-')}</div><div><b>Class:</b> ${esc(st.cls)}</div><div><b>Roll No.:</b> ${esc(st.roll||'-')}</div><div><b>Attendance No.:</b> ${esc(st.att||'-')}</div><div><b>SR No.:</b> ${esc(st.sr||'-')}</div><div><b>ID No.:</b> ${esc(st.id)}${st.rte?'-R':''}</div></div></div>
+<div class="top"><div class="ph">${ph}</div><div class="kv"><div class="w nm">${esc(st.name)}</div><div><b>Father:</b> ${esc(st.father||'-')}</div><div><b>Class:</b> ${esc(st.cls)}</div><div><b>Roll No.:</b> ${esc(st.roll||'-')}</div><div><b>Attendance No.:</b> ${esc(st.att||'-')}</div><div><b>SR No.:</b> ${esc(st.sr||'-')}</div></div></div>
 <table><tr><th>#</th><th>Date</th><th>Day</th><th>Subject</th><th>Time</th><th>Invigilator sign</th></tr>${rows}</table>
 ${(G.ins||'').split('\n').filter(l=>l.trim()&&!/fee/i.test(l)).join('\n').trim()?`<div class="ins"><b>Instructions:</b>${esc((G.ins||'').split('\n').filter(l=>l.trim()&&!/fee/i.test(l)).join('\n').trim())}</div>`:''}
 <div class="sg"><div><i></i>Class Teacher</div><div>${sg.inch?`<img src="${sg.inch}">`:'<i></i>'}Exam Incharge</div><div><img src="${sg.pr}">${esc(sg.prt)}</div></div></div>`}
