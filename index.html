@@ -81,6 +81,7 @@ table.t{border-collapse:collapse;width:100%;font-size:13px}table.t td,table.t th
 .idc .band b{display:block;font-size:14.5px;letter-spacing:1.4px}.idc .band span{display:block;font-size:11px;margin-top:1px;opacity:.95}
 .idc .ph{width:110px;height:110px;margin:8px auto 4px;border:3px solid;border-radius:10px;overflow:hidden;background:#eef2f8;display:flex;align-items:center;justify-content:center;color:#7c8aa5;font-size:11px}
 .idc .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.idc .ph[data-dzk=photo]{flex:8 1 auto}
 .idc .nm{text-align:center;font-weight:700;text-transform:uppercase;padding:0 10px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lg2{background:#fff;border-radius:16px;overflow:hidden;box-shadow:var(--shadow);margin-top:10px;color:#12306b;--lgb:#0f2f6b;--lgo:#f5a623}
 .lg2 .hd{padding:12px 14px 8px;text-align:center;border-bottom:2px solid var(--lgb);background:#fff}
@@ -423,7 +424,7 @@ function cardHTML(st,photo){const D=designForSt(st),s=S.settings,c=routeColor(st
  const foot=D.footOne?`<div class="ft" data-dzk="foot" style="background:${c2[0]}"><div class="lb">${esc(D.footLabel)}</div><div class="nums1">${[s.phone1,s.phone2].filter(Boolean).map(esc).join(' &nbsp;|&nbsp; ')}</div></div>`:`<div class="ft" data-dzk="foot" style="background:${c2[0]}"><div class="lb">${esc(D.footLabel)}</div><div class="nums"><span>${esc(s.phone1||'')}</span><span>${esc(s.phone2||'')}</span></div></div>`;
  return `<div class="idc" style="background:${classTint(st.cls)}"><img class="wm" src="${EMB}"><div class="lg"><img src="${LOGO}"></div>
 <div class="band" data-dzk="band" style="background:${c[0]}"><b>${esc(D.band)}</b><span>Session ${esc(s.session||'')}</span></div>
-${rkCardHTML(st)}<div class="ph" data-dzk="photo" style="border-color:${c[0]};width:${D.photo}px;height:${D.photo}px">${ph}</div>
+${rkCardHTML(st)}<div class="ph" data-dzk="photo" style="border-color:${c[0]};width:${D.photo}px;height:${D.photo}px;max-height:${Math.round(D.photo*1.35)}px">${ph}</div>
 <div class="nm" data-dzk="name" style="font-size:${D.nameSize||nameSize(st.name)}px${D.nameCol&&isHex(D.nameCol)?';color:'+D.nameCol:''}">${nm}</div>${D.fatherSmall&&st.father?`<div class="fs" data-dzk="father"${D.fatherFs?` style="font-size:${D.fatherFs}px"`:''}>${D.fatherLabelOn?'Father: ':''}${esc(st.father)}</div>`:''}<div class="cl">Class ${cl}${st.seat&&st.seat!==st.cls?` <span class="seat">(Seating: ${esc(st.seat)})</span>`:''}</div>${floorLine(st)}${ldCardHTML(st.id)}${sbl.length?`<div class="el" style="font-size:10px;font-weight:700;margin-top:2px">Sibling in the School</div>${sbl.map(o=>`<div class="el" style="font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.name)} | ${esc(o.cls)}${o.village?' | '+esc(vu(o.village)):''}</div>`).join('')}`:''}${el?`<div class="el">Elder ${el.rel==='sib'?'sibling':'cousin'}: ${esc(el.name)} (Class ${esc(el.cls)})</div>`:''}
 ${body}<div class="sg" data-dzk="sig">${D.sigOn?`<img src="${D.sigImg||SIGN}"><span>${esc(D.sigText)}</span>`:''}</div>
 ${foot}</div>`}
@@ -1775,6 +1776,56 @@ function attSum(b){const date=ATS.date,m=date.slice(0,7),cls=attClasses();
  $('#at_d').onchange=e=>{ATS.date=e.target.value||today();viewAtt()};
  $('#at_x').onclick=()=>exportTableDialog('Attendance_summary_'+date,[[date,['Class','Day','A present','A absent','A leave','A total','B present','B total','C present','C total','D present','D total','Not marked'],rows.map(o=>[o.c,o.info.cnt?'':attDayName(o.info.t),o.A[0],o.A[1],o.A[2],o.tA||0,o.B[0],o.tB||0,o.C[0],o.tC||0,o.D[0],o.tD||0,o.info.cnt?o.N:''])]])}
 
+
+// ---------- Route form: Route -> Village -> Stop (primary and secondary), used in the student edit form ----------
+const RT_OTHER='__o';
+function rtRouteList(cur){const seen=new Set(),o=[],add=v=>{v=String(v||'').trim();if(!v)return;const k=rmKey(v);if(seen.has(k))return;seen.add(k);o.push(v)};
+ for(let i=1;i<=routeNums();i++)add('Route '+i);rmNames().forEach(add);add(cur);return o}
+function rtVillages(rv){const rn=routeNum(rv),set=[];if(!rn)return set;dueStops(rn).forEach(x=>{const v=vu(x.n);if(v&&!set.includes(v))set.push(v)});allStudents(true).filter(s=>routeNum(s.route1)===rn&&s.village).forEach(s=>{const v=vu(s.village);if(!set.includes(v))set.push(v)});return set}
+function rtStops(rv,vil){const rn=routeNum(rv),v=vu(vil);return dueStops(rn).map((x,i)=>({i:i+1,n:x.n||'',lm:x.lm||''})).filter(x=>x.n&&vu(x.n)===v)}
+function rtBoxHTML(st){const sel=(id,opts,cur,ph)=>`<select id="${id}"><option value="">${ph}</option>${opts.map(o=>`<option value="${esc(o)}" ${o===cur?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
+ const r1=String(st.route1||'').trim(),r2=String(st.route2||'').trim(),two=!!(st.route2||st.stop2);
+ return `<div style="border-left:4px solid #1d56b0;background:#f3f7ff;border-radius:8px;padding:8px 10px;margin-top:12px"><b>Primary route (where the child boards)</b>
+<label class="f">Route (bus start → end)</label><select id="e_route1"><option value="">Select route</option></select>
+<label class="f">Village (only this route's villages)</label><select id="e_vs"></select>
+<div id="e_vo" hidden><input type="text" id="e_village" list="vl_dl" autocapitalize="characters" placeholder="Type the village" value="${esc(vu(st.village))}"><datalist id="vl_dl">${(()=>{const c=busCnt().v;return villageList().map(x=>`<option value="${esc(x)}" label="${(c[vu(x)]||{n:0}).n} children">`).join('')})()}</datalist></div>
+<label class="f">Stop (only this village's stops)</label><select id="e_ss"></select>
+<div id="e_so" hidden><div class="row"><div class="grow"><label class="f">Stop name / landmark place</label><input type="text" id="e_stop1" value="${esc(st.stop1||'')}"></div><div style="width:96px"><label class="f">Stop no.</label><input type="tel" inputmode="numeric" id="e_stopno" value="${esc(st.stopno||'')}"></div></div></div>
+<label class="f">Drop-off landmark (blank = the stop's landmark)</label><input type="text" id="e_lm" value="${esc(st.lm||'')}"></div>
+<label class="f">Return route (blank = same as the pickup route)</label><input type="text" id="e_rret" value="${esc(st.rret||'')}"><label class="f">Return stop (blank = same as the pickup stop)</label><input type="text" id="e_sret" value="${esc(st.sret||'')}">
+<div id="e_r2box" ${two?'':'hidden'} style="border-left:4px solid #b35a00;background:#fff7ec;border-radius:8px;padding:8px 10px;margin-top:12px"><b>Secondary route (optional)</b>
+<label class="f">Route</label><select id="e_route2"><option value="">Select route</option></select>
+<label class="f">Village</label><select id="e_vs2"></select><div id="e_vo2" hidden><input type="text" id="e_v2o" placeholder="Type the village"></div>
+<label class="f">Stop</label><select id="e_ss2"></select><div id="e_so2" hidden><input type="text" id="e_s2o" placeholder="Type the stop"></div>
+<input type="hidden" id="e_stop2" value="${esc(st.stop2||'')}"><div class="small muted">Leave all three empty if there is no secondary route.</div></div>`}
+function rtWire(sh,st,upd){const $$=i=>sh.querySelector('#'+i),fire=el=>{el.dispatchEvent(new Event('input',{bubbles:true}))};
+ const opts=(el,list,cur,ph,other)=>{el.innerHTML=`<option value="">${ph}</option>`+list.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')+`<option value="${RT_OTHER}">${other}</option>`;el.value=cur};
+ const fillRoutes=(el,cur)=>{const L=rtRouteList(cur);el.innerHTML='<option value="">Select route</option>'+L.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');el.value=cur&&L.find(x=>rmKey(x)===rmKey(cur))||''};
+ // ----- primary
+ const R=$$('e_route1'),VS=$$('e_vs'),VI=$$('e_village'),VO=$$('e_vo'),SS=$$('e_ss'),SO=$$('e_so'),S1=$$('e_stop1'),SN=$$('e_stopno');
+ fillRoutes(R,String(st.route1||'').trim());
+ const drawV=()=>{const list=rtVillages(R.value),cur=vu(VI.value);if(cur&&!list.includes(cur))list.unshift(cur);opts(VS,list,cur&&list.includes(cur)?cur:'','Select village','Other village (type)…');VO.hidden=!(VS.value===RT_OTHER)};
+ const drawS=()=>{const v=vu(VI.value),L=rtStops(R.value,v),no=String(SN.value||'').trim();SS.innerHTML='<option value="">Select stop</option>'+L.map(x=>`<option value="${x.i}">Stop ${x.i} — ${esc(x.n)}${x.lm?' ('+esc(x.lm)+')':''}</option>`).join('')+`<option value="${RT_OTHER}">Other stop (type)…</option>`;
+  const hit=L.find(x=>String(x.i)===no);SS.value=hit?String(hit.i):((no||S1.value.trim())?RT_OTHER:'');SO.hidden=!(SS.value===RT_OTHER||(!L.length&&SS.value===''&&v&&false))&&L.length>0;if(!L.length)SO.hidden=false};
+ drawV();drawS();
+ R.onchange=()=>{const v=vu(VI.value);drawV();if(v&&!rtVillages(R.value).includes(v)){/* keep the child's village even if not on this route */}drawS();upd()};
+ VS.onchange=()=>{if(VS.value===RT_OTHER){VO.hidden=false;VI.focus();drawS();upd();return}VO.hidden=true;const old=vu(VI.value);VI.value=VS.value;const L=rtStops(R.value,VS.value);if(VS.value!==old&&!L.some(x=>String(x.i)===String(SN.value).trim())){SN.value='';S1.value=''}drawS();upd()};
+ VI.oninput=()=>{drawS();upd()};
+ SS.onchange=()=>{if(SS.value===RT_OTHER){SO.hidden=false;upd();return}if(!SS.value){SN.value='';S1.value='';SO.hidden=SS.querySelectorAll('option').length>2?true:false;upd();return}const x=rtStops(R.value,VI.value).find(y=>String(y.i)===SS.value);if(x){SN.value=String(x.i);S1.value=vu(x.n)===vu(VI.value)?'':x.n;SO.hidden=true}upd()};
+ [S1,SN].forEach(e=>{e.oninput=upd});
+ // ----- secondary
+ const R2=$$('e_route2'),VS2=$$('e_vs2'),VO2=$$('e_vo2'),V2=$$('e_v2o'),SS2=$$('e_ss2'),SO2=$$('e_so2'),S2O=$$('e_s2o'),H2=$$('e_stop2');
+ fillRoutes(R2,String(st.route2||'').trim());
+ {const raw=String(st.stop2||'').trim(),p=raw.split(' - '),a=vu(p[0]||''),b=(p.slice(1).join(' - ')||'').trim(),L0=rtVillages(R2.value);
+  if(raw){if(L0.includes(a)){opts(VS2,L0,a,'Select village','Other village (type)…');V2.value='';const sl=rtStops(R2.value,a);SS2.innerHTML='<option value="">Select stop</option>'+sl.map(x=>`<option value="${esc(x.n)}">Stop ${x.i} — ${esc(x.n)}</option>`).join('')+`<option value="${RT_OTHER}">Other stop (type)…</option>`;SS2.value=!b?'':(sl.find(x=>x.n===b)?b:RT_OTHER);S2O.value=sl.find(x=>x.n===b)?'':b;SO2.hidden=SS2.value!==RT_OTHER}
+   else{opts(VS2,L0,RT_OTHER,'Select village','Other village (type)…');V2.value=raw;VO2.hidden=false}}}
+ const comp=()=>{const v=VS2.value===RT_OTHER?V2.value.trim():VS2.value,sn=SS2.value===RT_OTHER?S2O.value.trim():SS2.value;H2.value=[v?vu(v):'',sn&&vu(sn)!==vu(v)?sn:''].filter(Boolean).join(' - ');upd()};
+ const drawV2=()=>{const L=rtVillages(R2.value),cur=VS2.value;opts(VS2,L,L.includes(cur)||cur===RT_OTHER?cur:'','Select village','Other village (type)…');VO2.hidden=VS2.value!==RT_OTHER};
+ const drawS2=()=>{const sl=VS2.value&&VS2.value!==RT_OTHER?rtStops(R2.value,VS2.value):[],cur=SS2.value;SS2.innerHTML='<option value="">Select stop</option>'+sl.map(x=>`<option value="${esc(x.n)}">Stop ${x.i} — ${esc(x.n)}</option>`).join('')+`<option value="${RT_OTHER}">Other stop (type)…</option>`;SS2.value=[...SS2.options].some(o=>o.value===cur)?cur:'';SO2.hidden=SS2.value!==RT_OTHER};
+ if(!VS2.options.length){opts(VS2,rtVillages(R2.value),'','Select village','Other village (type)…')}
+ R2.onchange=()=>{drawV2();drawS2();comp()};VS2.onchange=()=>{VO2.hidden=VS2.value!==RT_OTHER;drawS2();comp()};SS2.onchange=()=>{SO2.hidden=SS2.value!==RT_OTHER;comp()};V2.oninput=comp;S2O.oninput=comp;
+ if(!SS2.options.length)drawS2()}
+
 // ---------- DUE-14 phase 1: responsibilities, floor / transport in-charge, weekly class monitoring, reports (admin only) ----------
 const MST0=['OK','Needs Improvement','Negative Feedback','Without Information','Informed','Under Follow-up','Improved'];
 const MTG0=[['Personal Hygiene',['Uniform','Hair and Grooming','Nails','Cleanliness','Shoes and Socks','Personal Hygiene']],['Punctuality',['School Arrival on Time','Late Arrival','Repeated Late Arrival']],['Homework',['Homework Completed','Homework Incomplete','Homework Not Done','Homework Not Brought','Repeated Homework Issues']],['Student Discipline',['Classroom Behaviour','Respect for Teachers','Behaviour with Other Students','Classroom Participation','Other Observations']],['Other Issues',['Missing Books / Notebooks','Incomplete Classwork','Irregular Attendance','Other Concerns']]];
@@ -2142,8 +2193,7 @@ function editStudent(st,mode){const adm=mode==='admin'&&can('edit');const isNew=
 <div class="row"><div class="grow"><label class="f">Class</label>${sel('e_base',sp[0],bases,'Select')}</div><div class="grow"><label class="f">Section</label>${sel('e_sec',sp[1],secsFor(sp[0]),'Select')}</div></div>
 <div class="row"><div class="grow"><label class="f">Seating class (if different from actual class)</label>${sel('e_sbase',ss[0],bases,'Same class')}</div><div class="grow"><label class="f">Section</label>${sel('e_ssec',ss[1],secsFor(ss[0]),'—')}</div></div>
 ${f('roll','Roll number')}${f('father','Father Name')}${f('mother','Mother Name')}${fp('contact','Father Mobile')}${fp('contact2','Mother Mobile')}${f('gname','Guardian name (if other than parents)')}<div id="xn_rows">${xnList(st).map(xnRowHTML).join('')}</div><button type="button" class="btn sec sm" id="xn_add" style="margin-top:6px">+ Add another mobile number (guardian / other)</button>
-<label class="f">Village (where the child lives now) — pick from the saved list</label><input type="text" id="e_village" list="vl_dl" autocapitalize="characters" value="${esc(vu(st.village))}"><datalist id="vl_dl">${(()=>{const c=busCnt().v;return villageList().map(x=>`<option value="${esc(x)}" label="${(c[vu(x)]||{n:0}).n} children">`).join('')})()}</datalist>
-${f('native','Native District (leave blank if none)')}${f('route1','Bus Route (Primary), e.g. Route 3')}${f('stop1','Primary Route village/stop, e.g. Batda Khurd')}${f('stopno','Bus stop number')}${f('lm','Drop-off landmark (blank = the stop\'s landmark)')}${f('rret','Return route (blank = same as the pickup route)')}${f('sret','Return stop (blank = same as the pickup stop)')}<div id="e_r2box" ${(st.route2||st.stop2)?'':'hidden'}>${f('route2','Second bus route, e.g. Route 6 (shown on the card only when filled)')}${f('stop2','Second route village/stop')}</div>${(st.route2||st.stop2)?'':'<button type="button" class="btn sec sm" id="e_r2add" style="margin-top:8px">+ Add second route</button>'}
+${f('native','Native District (leave blank if none)')}${rtBoxHTML(st)}${(st.route2||st.stop2)?'':'<button type="button" class="btn sec sm" id="e_r2add" style="margin-top:8px">+ Add second route</button>'}
 <div class="row"><div class="grow"><label class="f">Gender</label><select id="e_gender"><option value="">—</option><option value="M" ${st.gender==='M'?'selected':''}>Boy</option><option value="F" ${st.gender==='F'?'selected':''}>Girl</option></select></div><div class="grow"><label class="f">Social category</label><select id="e_cat2"><option value="">—</option>${CATS2.map(c=>`<option ${st.cat2===c?'selected':''}>${c}</option>`).join('')}</select></div></div>
 ${f('att','Attendance number')}${adm?f('spec','Special identification number'):''}
 <label class="row small" style="gap:8px;margin-top:10px"><input type="checkbox" id="e_sc" ${st.sc?'checked':''}> Staff child</label><label class="row small" style="gap:8px;margin-top:6px"><input type="checkbox" id="e_tmp" ${st.tmp?'checked':''}> Not in PSP list (sits in this class but is not in the portal list)</label><label class="row small" style="gap:8px;margin-top:6px"><input type="checkbox" id="e_nobus" ${st.nobus?'checked':''}> Does not use the school bus</label>
@@ -2162,7 +2212,7 @@ ${adm?`<label class="f">Student ID ${isNew?'(auto-generated; you can change it)'
  const upd=()=>{const n=vals();const e=effInfo(classKey(n.seat||n.cls||'-'));const th=st.id&&S.thumbs[st.id];$('#evin').innerHTML=cardHTML(Object.assign({},n,{id:n.id||'(New)',floor:e.floor,room:e.room,rte:$('#e_rte')?$('#e_rte').value==='1':!!st.rte}),th&&th.d)};
  sh.querySelectorAll('input,select').forEach(i=>{i.oninput=upd;i.onchange=upd});
  {const ra=$('#e_r2add');if(ra)ra.onclick=()=>{$('#e_r2box').hidden=false;ra.remove()};const dls=document.createElement('div');const rts=[...new Set(allStudents(true).flatMap(s=>[s.route1,s.route2,s.rret]).filter(Boolean).concat(rmNames()).concat(Array.from({length:routeNums()},(_,i)=>'Route '+(i+1))))],nts=[...new Set(allStudents(true).map(s=>s.native).filter(Boolean))].sort();dls.innerHTML=`<datalist id="dl_route">${rts.map(x=>`<option value="${esc(x)}">`).join('')}</datalist><datalist id="dl_nat">${nts.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`;$('#e_route1').parentNode.appendChild(dls);[['route1','dl_route'],['route2','dl_route'],['rret','dl_route'],['native','dl_nat']].forEach(([k,l])=>{const el=$('#e_'+k);if(el)el.setAttribute('list',l)})}
- xnBind(sh);
+ xnBind(sh);rtWire(sh,st,upd);
  $('#e_base').onchange=()=>{fixSec('e_base','e_sec','Select');upd()};$('#e_sbase').onchange=()=>{fixSec('e_sbase','e_ssec','—');upd()};upd();
  $('#ec').onclick=()=>isNew?closeSheet():openStudent(st.id);
  const saveH=async()=>{const n=vals();
@@ -3917,7 +3967,7 @@ function tkForm(kind,id){const cur=id?(kind==='at'?S.atask:S.todo)[id]:null,d=$(
 // ================= Certificates: Fee certificate, Study certificate, Fee estimate (+ fee rates) =================
 const CRT={tab:'make',type:'',q:'',cls:'',f:null,sess:'',rcls:'',draft:null};
 const CTYPES={fc:{n:'Fee Certificate',t:'FEE CERTIFICATE',d:'Fees actually paid by the child (for Income Tax, bank, reimbursement).'},
- sc:{n:'Study Certificate',t:'STUDY CERTIFICATE',d:'Bona fide student certificate (class, session, date of birth).'},
+ sc:{n:'Study Certificate',t:'STUDY CERTIFICATE',d:'Student certificate with scholar no., date of birth, class, session, fee and bus charges.'},
  fe:{n:'Fee Estimate',t:'FEE ESTIMATE',d:'Fee for the full year as per the fee structure (even if nothing is paid yet).'}};
 const ctAllowed=()=>isAdmin()||(S.me&&S.me.cat==='acct');
 const ctSess=()=>CRT.sess||String((S.settings&&S.settings.session)||'').trim()||'2026-27';
@@ -3934,6 +3984,7 @@ function ctSal(s){return s.gender==='F'?{sal:'Miss',rel:'D/o'}:s.gender==='M'?{s
 function ctNextNo(type,sess){let mx=0;Object.values(S.certs||{}).forEach(c=>{if(c.type===type&&c.sess===sess&&c.n>mx)mx=c.n});const code={fc:'FC',sc:'SC',fe:'FE'}[type];return{n:mx+1,no:`RIS/${code}/${sess}/${String(mx+1).padStart(4,'0')}`}}
 function ctDraft(type,s){const sess=ctSess(),sl=ctSal(s),nx=ctNextNo(type,sess);
  const d={type,sid:s.id,sess,no:nx.no,n:nx.n,date:today(),sal:sl.sal,name:s.name||'',rel:sl.rel,father:s.father||'',cls:s.cls,idn:s.id,dob:(S.priv[s.id]||{}).dob||'',items:[],rte:!!s.rte,waive:false};
+ if(type==='sc'){d.sal='';d.g=s.gender||'';d.village=vu(s.village||'');d.sr=String(s.sr||'');const r=ctRates(sess,s.cls)||[];d.fee=r.reduce((a,x)=>a+(+x.a||0),0)||'';d.bus=(!s.nobus&&s.village)?(ctBus(sess,s.village)||0):0;if(s.rte)d.fee=0}
  if(type==='fe'||type==='fc'){const r=ctRates(sess,s.cls)||[];let items=r.map(x=>({n:x.n,a:type==='fe'?(+x.a||0):0}));
   if(type==='fe'){const bus=!s.nobus&&s.village?ctBus(sess,s.village):0;if(bus)items.push({n:'Transport Fee ('+vu(s.village)+')',a:bus});if(s.rte){d.waive=true;items=items.map(x=>({n:x.n,a:0}))}}
   if(!items.length)items=[{n:'Tuition Fee',a:0}];d.items=items}
@@ -3953,7 +4004,8 @@ function ctCss(){return `.cf{width:794px;height:1123px;box-sizing:border-box;bac
 .cf .ft{position:absolute;left:44px;right:44px;bottom:30px;display:flex;align-items:center;gap:12px}.cf .ft i{flex:1;height:3px;background:linear-gradient(90deg,#12306e,#c8962e)}.cf .ft b{font:italic 700 17px Arial;color:#12306e}`}
 function ctHTML(d){const T=CTYPES[d.type],who=`${d.sal?esc(d.sal)+' ':''}<span class="v">${esc(d.name)}</span>, ${esc(d.rel)} <span class="v">${esc(d.father)}</span>`;
  const total=(d.items||[]).reduce((a,x)=>a+(+x.a||0),0);let body='';
- if(d.type==='sc')body=`This is to certify that ${who}, is a bona fide student of this school and is studying in Class <span class="v">${esc(d.cls)}</span> during the Academic Session <span class="v">${esc(d.sess)}</span> (Student ID <span class="v">${esc(d.idn)}</span>).${d.dob?`<br>As per the school record, the Date of Birth is <span class="v">${esc(fmtDate(d.dob))}</span> (<span class="v">${esc(ctDateWords(d.dob))}</span>).`:''}`;
+ if(d.type==='sc'){const g=d.g||'',P=g==='F'?['Her','She']:g==='M'?['His','He']:['The student\'s','The student'],dm=String(d.dob||'').match(/^(\d{4})-(\d{2})-(\d{2})$/),dd=dm?dm[3]+'/'+dm[2]+'/'+dm[1]:esc(d.dob||''),bus=+d.bus||0;
+  body=`<div style="text-align:center;margin:0 0 14px"><b style="font:700 22px 'Times New Roman',serif;text-decoration:underline">To whom it may concern</b></div>It is certified that <b style="text-transform:uppercase">${d.sal?esc(d.sal)+' ':''}${esc(d.name)} ${esc(d.rel)} ${esc(d.father)}</b> Village- <b style="text-transform:uppercase">${esc(d.village||'')}</b> is a student of Radiant International Sec. School, Kharsan. ${P[0]} scholar no. is <b>${esc(d.sr||'')}</b>. ${P[0]} DOB is <b>${dd}</b>. ${P[1]} is studying in class <b>${esc(d.cls)}</b> in session <b>${esc(d.sess)}</b>. <b>${P[0]} fee is Rs. ${ctMoney(d.fee)}${bus>0?' and bus charges will be Rs. '+ctMoney(bus):''} for the current session.${bus>0?'':' Bus facility has not been taken.'}</b>`}
  else{const tbl=`<table><tr><th style="width:56px">S.No.</th><th>Particulars</th><th class="r" style="width:150px">${d.type==='fe'?'Yearly amount':'Amount paid'} (₹)</th></tr>${(d.items||[]).map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.n)}</td><td class="r">${ctMoney(x.a)}</td></tr>`).join('')}<tr class="tt2"><td colspan="2" class="r">Total</td><td class="r">${ctMoney(total)}</td></tr></table><div class="wd">Amount in words: <span class="v">Rupees ${esc(ctWords(total))} Only</span></div>`;
   body=d.type==='fc'?`This is to certify that ${who}, a student of Class <span class="v">${esc(d.cls)}</span> (Student ID <span class="v">${esc(d.idn)}</span>) of this school, has paid the following fees for the Academic Session <span class="v">${esc(d.sess)}</span>.${tbl}`
    :`This is to certify that the fees of this school for Class <span class="v">${esc(baseOf(d.cls))}</span>, Academic Session <span class="v">${esc(d.sess)}</span>, are as given below. This estimate is given for ${who} (Student ID <span class="v">${esc(d.idn)}</span>).${tbl}<div class="nt">${d.waive?'RTE student — no fee is payable. ':''}This is an estimate for the full year, not a receipt. Fees may change as decided by the school management.</div>`}
@@ -3983,10 +4035,10 @@ function ctForm(d){const ov=document.createElement('div');ov.id='ct_ov';ov.style
   ov.innerHTML=`<style>${ctCss()}.ctw{margin:8px auto;box-shadow:0 1px 8px #0004;width:${w}px;height:${1123*z}px;overflow:hidden}.ctw .cf{transform:scale(${z});transform-origin:0 0}</style>
 <div style="background:#fff;padding:10px;border-bottom:1px solid #ccd;position:sticky;top:0;z-index:3"><div class="row"><b class="grow">${esc(T.n)}</b><button class="btn sec sm" id="ct_x">✕ Close</button></div></div>
 <div class="box" style="margin:8px"><div class="row"><div class="grow">${row('no','Certificate no.')}</div><div class="grow">${row('date','Date','date')}</div></div>
-<div class="row"><div style="width:90px"><label class="f" style="margin-top:6px">Title</label><select data-k="sal">${['','Master','Miss','Mr.','Ms.'].map(x=>`<option ${d.sal===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="grow">${row('name','Student name')}</div></div>
+<div class="row"><div style="width:90px;${d.type==='sc'?'display:none':''}"><label class="f" style="margin-top:6px">Title</label><select data-k="sal">${['','Master','Miss','Mr.','Ms.'].map(x=>`<option ${d.sal===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="grow">${row('name','Student name')}</div></div>
 <div class="row"><div style="width:90px"><label class="f" style="margin-top:6px">Relation</label><select data-k="rel">${['S/o','D/o','Child of'].map(x=>`<option ${d.rel===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="grow">${row('father','Father\'s name')}</div></div>
 <div class="row"><div class="grow">${row('cls','Class')}</div><div class="grow">${row('sess','Session')}</div></div>${row('idn','Student ID')}
-${d.type==='sc'?row('dob','Date of birth','date'):`<div style="margin-top:8px"><b class="small">${d.type==='fe'?'Fee items (yearly amount)':'Fees paid — enter the amount actually paid'}</b>${d.waive?'<div class="small" style="color:#b3261e">RTE student: amounts are zero. Change them only if fees are really charged.</div>':''}
+${d.type==='sc'?row('village','Village')+row('sr','Scholar no.')+row('dob','Date of birth','date')+row('fee','Fee for the session (Rs.)','number')+row('bus','Bus charges (Rs.) — 0 if bus is not used','number'):`<div style="margin-top:8px"><b class="small">${d.type==='fe'?'Fee items (yearly amount)':'Fees paid — enter the amount actually paid'}</b>${d.waive?'<div class="small" style="color:#b3261e">RTE student: amounts are zero. Change them only if fees are really charged.</div>':''}
 <div id="ct_items">${d.items.map((x,i)=>`<div class="row" style="margin-top:4px;flex-wrap:nowrap"><input type="text" data-it="n" data-i="${i}" value="${esc(x.n)}" class="grow"><input type="number" inputmode="numeric" data-it="a" data-i="${i}" value="${x.a||''}" placeholder="₹" style="width:96px"><button class="btn sec sm" data-rm="${i}">✕</button></div>`).join('')}</div>
 <div class="row" style="margin-top:6px"><button class="btn sec sm" id="ct_add">+ Add item</button>${d.type==='fc'?'<button class="btn sec sm" id="ct_fill">Fill from fee structure</button>':''}</div></div>`}
 <div class="row" style="margin-top:12px"><button class="btn grow" id="ct_wa" style="background:#1f9d55">📲 WhatsApp</button><button class="btn grow" id="ct_em" style="background:#1d56b0">✉ Email</button></div>
@@ -3999,7 +4051,7 @@ ${d.type==='sc'?row('dob','Date of birth','date'):`<div style="margin-top:8px"><
   ov.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{d.items.splice(+b.dataset.rm,1);render()});
   if(ov.querySelector('#ct_add'))ov.querySelector('#ct_add').onclick=()=>{d.items.push({n:'',a:0});render()};
   if(ov.querySelector('#ct_fill'))ov.querySelector('#ct_fill').onclick=()=>{const r=ctRates(d.sess,d.cls);if(!r||!r.length)return toast('No fee structure is saved for this class yet (Certificates → Fee rates).',4500);d.items=r.map(x=>({n:x.n,a:+x.a||0}));render()};
-  const guard=()=>{if(!d.name.trim()||!d.cls.trim()){toast('Student name and class are required.');return false}if(d.type!=='sc'&&!(d.items||[]).some(x=>+x.a>0)&&!d.waive){toast('Please enter at least one amount.');return false}return true};
+  const guard=()=>{if(!d.name.trim()||!d.cls.trim()){toast('Student name and class are required.');return false}if(d.type==='sc'){const miss=[['father','Father\'s name'],['village','Village'],['sr','Scholar no.'],['dob','Date of birth'],['sess','Session']].filter(x=>!String(d[x[0]]||'').trim()).map(x=>x[1]);if(String(d.fee).trim()==='')miss.push('Fee');if(String(d.bus).trim()==='')miss.push('Bus charges (0 if not used)');if(miss.length){toast('Please fill: '+miss.join(', '),6000);return false}}if(d.type!=='sc'&&!(d.items||[]).some(x=>+x.a>0)&&!d.waive){toast('Please enter at least one amount.');return false}return true};
   const act=(id,fn)=>{ov.querySelector(id).onclick=async()=>{const b=ov.querySelector(id);if(b.disabled||!guard())return;b.disabled=true;try{await fn();await ctIssue(d)}catch(e){}b.disabled=false}};
   act('#ct_pdf',()=>ctPdf(d));act('#ct_wa',()=>ctSend(d,'wa'));act('#ct_em',()=>ctSend(d,'em'));act('#ct_pr',async()=>{ctPrint(d)})};
  document.body.appendChild(ov);render()}
@@ -4308,7 +4360,7 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
-const APP_BUILD='due-v71';
+const APP_BUILD='due-v74';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
