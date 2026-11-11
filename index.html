@@ -686,13 +686,13 @@ function viewLogin(){const v=$('#view');
 ${isAdm?`<label class="f">2. Admin e-mail</label><input type="email" id="l_em" autocomplete="username" autocapitalize="off" value="${esc(lastAdminEmail())}">${pwField('l_pw','3. Password')}${showRow}<button class="lbtn" id="l_go">${LIC}Login</button><p class="small" style="margin:10px 0 0"><a href="#" id="l_forgot">Forgot password?</a></p>`
  :(L.cat?(names.length?`<label class="f">2. Choose your name</label><select id="l_sid"><option value="">— Select —</option>${names.map(([id,s])=>`<option value="${esc(id)}" ${L.sid===id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>`:'<p class="warn" style="margin:12px 0 0"><b>No staff available in this category.</b></p>'):'')}
 ${!isAdm&&L.sid&&S.login[L.sid]?`${pwField('l_pw','3. Password')}${showRow}<button class="lbtn" id="l_go">${LIC}Login</button><p class="small" style="margin:10px 0 0"><a href="#" id="l_forgot">Forgot password?</a></p>`:''}
-<div id="l_fb"></div><p class="muted small" style="margin:12px 0 0">Hindi digits (१२३) and extra spaces in the password are corrected automatically.</p></div><img class="bw" src="${LGF}" alt=""></div>`;
+<div id="l_fb"></div><p class="muted small" style="margin:12px 0 0">Hindi digits (१२३) and extra spaces in the password are corrected automatically.</p><div id="l_ver" class="small muted" style="margin-top:10px;text-align:center">App version: <b>${APP_BUILD}</b></div></div><img class="bw" src="${LGF}" alt=""></div>`;
  if(!$('#l_go')){$('#l_fb').innerHTML=`<button class="lbtn" id="l_go0">${LIC}Login</button>`;$('#l_go0').onclick=()=>toast(L.cat?'Choose your name to proceed':'Choose the category to proceed',3000)}
  document.body.classList.add('lgp');
  $('#l_cat').onchange=e=>{L.cat=e.target.value;L.sid='';const l=Object.entries(S.login).filter(([id,s])=>s.cat===L.cat&&id!=='admin');if(L.cat!=='admin'&&l.length===1)L.sid=l[0][0];viewLogin()};
  const sl=$('#l_sid');if(sl)sl.onchange=e=>{L.sid=e.target.value;viewLogin()};
  bindShow();
- if($('#l_go')){$('#l_go').onclick=doLogin;$('#l_pw').onkeydown=e=>{if(e.key==='Enter')doLogin()};$('#l_forgot').onclick=e=>{e.preventDefault();L.mode='forgot';viewLogin()}}}
+ verCheck(); if($('#l_go')){$('#l_go').onclick=doLogin;$('#l_pw').onkeydown=e=>{if(e.key==='Enter')doLogin()};$('#l_forgot').onclick=e=>{e.preventDefault();L.mode='forgot';viewLogin()}}}
 
 async function doLogin(){const pw=normPw($('#l_pw').value);if(!pw)return toast('Enter the password.');
  let email;
@@ -5801,7 +5801,7 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
-const APP_BUILD='due-v100';
+const APP_BUILD='due-v101';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
@@ -5811,6 +5811,9 @@ function viewAppCheck(){const v=$('#view');
 <div class="box"><b>This phone is running: <span class="ok">${esc(APP_BUILD)}</span></b><div class="small muted">Role: ${esc(catLabel?catLabel(S.me.cat):S.me.cat)}</div><div class="row" style="margin-top:8px"><button class="btn" id="ac_run" ${AC.busy?'disabled':''}>${AC.busy?'Checking…':'Run the check'}</button><button class="btn sec" id="ac_rl">Reload the newest app</button></div></div>
 <div id="ac_out">${AC.res||''}</div>`;
  $('#ac_rl').onclick=acReload;$('#ac_run').onclick=acRun}
+const VER={newest:null,busy:false};
+async function verCheck(){const el=$('#l_ver');if(!el)return;const paint=()=>{const e=$('#l_ver');if(!e)return;if(VER.newest&&VER.newest!==APP_BUILD){e.innerHTML='App version: <b>'+esc(APP_BUILD)+'</b><div style="margin-top:6px;color:#b45309"><b>A newer version ('+esc(VER.newest)+') is available.</b></div><button class="btn sm" id="l_upd" style="margin-top:6px">Update now</button>';$('#l_upd').onclick=()=>{$('#l_upd').disabled=true;$('#l_upd').textContent='Updating…';acReload()}}else if(VER.newest){e.innerHTML='App version: <b>'+esc(APP_BUILD)+'</b> · up to date ✔'}};
+ if(VER.newest!==null)return paint();if(VER.busy||navigator.onLine===false)return;VER.busy=true;try{const r=await fetch(location.pathname+'?nocache='+Date.now(),{cache:'no-store'});const tx=await r.text();const m=tx.match(/const APP_BUILD='([^']+)'/);if(m)VER.newest=m[1]}catch(e){}VER.busy=false;paint()}
 async function acReload(){try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}if(navigator.serviceWorker){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()))}}catch(e){}
  const u=location.href.split('#')[0].replace(/([?&])v=\d+&?/,'$1').replace(/[?&]$/,'');location.replace(u+(u.includes('?')?'&':'?')+'v='+Date.now())}
 async function acRun(){AC.busy=true;AC.res='';AC.errs=[];viewAppCheck();const rows=[];const ok=(t,good,note)=>rows.push(`<div class="row small" style="padding:3px 0;flex-wrap:nowrap"><span class="${good?'ok':'bad'}" style="min-width:18px">${good?'✔':'✖'}</span><span class="grow">${esc(t)}${note?` <span class="muted">— ${esc(note)}</span>`:''}</span></div>`);
