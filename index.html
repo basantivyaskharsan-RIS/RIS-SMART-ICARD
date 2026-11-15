@@ -1826,16 +1826,17 @@ function rtWire(sh,st,upd){const $$=i=>sh.querySelector('#'+i),fire=el=>{el.disp
  const R=$$('e_route1'),VS=$$('e_vs'),VI=$$('e_village'),VO=$$('e_vo'),SS=$$('e_ss'),SO=$$('e_so'),S1=$$('e_stop1'),SN=$$('e_stopno');
  fillRoutes(R,String(st.route1||'').trim());
  const drawV=()=>{const list=rtVillages(R.value),cur=vu(VI.value);if(cur&&!list.includes(cur))list.unshift(cur);opts(VS,list,cur&&list.includes(cur)?cur:'','Select village','Other village (type)…');VO.hidden=!(VS.value===RT_OTHER)};
- const drawS=()=>{const v=vu(VI.value),L=rtStops(R.value,v),no=String(SN.value||'').trim();SS.innerHTML='<option value="">Select stop</option>'+L.map(x=>`<option value="${x.i}">Stop ${x.i} — ${esc(x.n)}${x.lm?' ('+esc(x.lm)+')':''}</option>`).join('')+`<option value="${RT_OTHER}">Other stop (type)…</option>`;
-  const hit=L.find(x=>String(x.i)===no);SS.value=hit?String(hit.i):((no||S1.value.trim())?RT_OTHER:'');SO.hidden=!(SS.value===RT_OTHER||(!L.length&&SS.value===''&&v&&false))&&L.length>0;if(!L.length)SO.hidden=false};
+ let EX=[];
+ const drawS=()=>{const v=vu(VI.value),L=rtStops(R.value,v),no=String(SN.value||'').trim();EX=v?vgStops(v).filter(o=>!L.some(x=>nrm(x.lm)===nrm(o.a)||nrm(x.n)===nrm(o.a))):[];SS.innerHTML='<option value="">Select stop</option>'+L.map(x=>`<option value="${x.i}">Stop ${x.i} — ${esc(x.n)}${x.lm?' ('+esc(x.lm)+')':''}</option>`).join('')+(EX.length?`<optgroup label="Other stops of this village (morning / afternoon / saved)">${EX.map((o,i)=>`<option value="x${i}">＋ ${esc(o.a)} — ${esc(o.src)}</option>`).join('')}</optgroup>`:'')+`<option value="${RT_OTHER}">Other stop (type)…</option>`;
+  const hit=L.find(x=>String(x.i)===no),xi=(!hit&&!no)?EX.findIndex(o=>nrm(o.a)===nrm(S1.value)):-1;SS.value=hit?String(hit.i):xi>=0?'x'+xi:((no||S1.value.trim())?RT_OTHER:'');SO.hidden=!(SS.value===RT_OTHER||(!L.length&&SS.value===''&&v&&false))&&L.length>0;if(!L.length)SO.hidden=false};
  drawV();drawS();
  R.onchange=()=>{const v=vu(VI.value);drawV();if(v&&!rtVillages(R.value).includes(v)){/* keep the child's village even if not on this route */}drawS();upd()};
  VS.onchange=()=>{if(VS.value===RT_OTHER){VO.hidden=false;VI.focus();drawS();upd();return}VO.hidden=true;const old=vu(VI.value);VI.value=VS.value;const L=rtStops(R.value,VS.value);if(VS.value!==old&&!L.some(x=>String(x.i)===String(SN.value).trim())){SN.value='';S1.value=''}drawS();upd()};
  VI.oninput=()=>{drawS();upd()};
- SS.onchange=()=>{if(SS.value===RT_OTHER){SO.hidden=false;upd();return}if(!SS.value){SN.value='';S1.value='';SO.hidden=SS.querySelectorAll('option').length>2?true:false;upd();return}const x=rtStops(R.value,VI.value).find(y=>String(y.i)===SS.value);if(x){SN.value=String(x.i);S1.value=vu(x.n)===vu(VI.value)?'':x.n;SO.hidden=true}upd()};
+ SS.onchange=()=>{if(SS.value===RT_OTHER){SO.hidden=false;upd();return}if(/^x\d+$/.test(SS.value)){const o=EX[+SS.value.slice(1)];if(o){SN.value='';S1.value=o.a;SO.hidden=false}upd();return}if(!SS.value){SN.value='';S1.value='';SO.hidden=SS.querySelectorAll('option').length>2?true:false;upd();return}const x=rtStops(R.value,VI.value).find(y=>String(y.i)===SS.value);if(x){SN.value=String(x.i);S1.value=vu(x.n)===vu(VI.value)?'':x.n;SO.hidden=true}upd()};
  [S1,SN].forEach(e=>{e.oninput=()=>{const D=$$('e_depdiff');if(D)D.checked=true;upd()}});
  const MR=$$('e_mroute'),MS=$$('e_mstop'),DD=$$('e_depdiff'),DN=$$('e_dnote'),DB=$$('e_dsame');
- if(MR&&MS){const drawMS=()=>{const r=S.tmr[MR.value],cur=MS.value||st.mstop||'';MS.innerHTML='<option value="">Not set</option>'+((r&&r.stops)||[]).filter(x=>x.active!==false||x.id===cur).map(x=>`<option value="${esc(x.id)}">${esc(x.n)}${x.t?' · '+esc(x.t):''}</option>`).join('')+((cur&&MR.value===st.mroute&&!((r&&r.stops)||[]).some(x=>x.id===cur))?`<option value="${esc(cur)}">(stop not found)</option>`:'');MS.value=cur&&[...MS.options].some(o=>o.value===cur)?cur:''};
+ if(MR&&MS){const drawMS=()=>{const r=S.tmr[MR.value],cur=MS.value||st.mstop||'';const AL=((r&&r.stops)||[]).filter(x=>x.active!==false||x.id===cur),vv=vu(VI.value),AV=vv?AL.filter(x=>vu(STP(x.n).v)===vv):[],AO=AL.filter(x=>!AV.includes(x)),ao=x=>`<option value="${esc(x.id)}">${esc(x.n)}${x.t?' · '+esc(x.t):''}</option>`;MS.innerHTML='<option value="">Not set</option>'+(AV.length?`<optgroup label="Stops of ${esc(vv)}">${AV.map(ao).join('')}</optgroup><optgroup label="Other stops of this route">${AO.map(ao).join('')}</optgroup>`:AL.map(ao).join(''))+((cur&&MR.value===st.mroute&&!((r&&r.stops)||[]).some(x=>x.id===cur))?`<option value="${esc(cur)}">(stop not found)</option>`:'');MS.value=cur&&[...MS.options].some(o=>o.value===cur)?cur:''};
   const mso=()=>{const r=S.tmr[MR.value];return r&&(r.stops||[]).find(x=>x.id===MS.value)};
   const note=()=>{DN.textContent='';DB.hidden=true;const o=mso();if(!o||(DD&&DD.checked))return;const m=depMatchStop(R.value,o.n);if(!R.value){DN.textContent='Choose the departure route to match the morning stop.';return}if(!m){DN.textContent='Stop not in Timetable for this route: choose the departure stop yourself.';DN.style.color='#b00020';return}DN.style.color='';if(String(SN.value||'').trim()!==m.no){DN.textContent='The departure stop is not the same as the morning stop ('+stJoin(m.name,m.lm)+').';DB.hidden=false}else DN.textContent='✔ Same as the morning stop: '+stJoin(m.name,m.lm)};
   const follow=()=>{const o=mso();if(!o)return note();const m=depMatchStop(R.value,o.n);if(!m)return note();if(!vu(VI.value))VI.value=vu(m.name);SN.value=m.no;S1.value=vu(m.name)===vu(VI.value)?'':m.name;drawV();drawS();note()};
@@ -3697,6 +3698,7 @@ function bsGroups(){const M=trRoutes('morning'),g={};allStudents().filter(s=>!s.
   const pool=[],add=a=>{a=String(a||'').trim();if(a&&nrm(a)!==nrm(v)&&!pool.some(p=>nrm(p)===nrm(a)))pool.push(a)};
   g[v].forEach(s=>add(bsKidStop(s)));
   [...new Set(g[v].map(s=>routeNum(s.route1)).filter(Boolean))].forEach(rn=>{try{dueStops(rn).forEach(x=>{if(vu(x.n)===v)add(x.lm)})}catch(e){}});
+  try{vgStops(v).forEach(o=>add(o.a))}catch(e){}
   return{v,kids:g[v],rts,pool,rid:rts.length===1?rts[0]:''}})}
 const bsMatch=(rid,v,a)=>{const m=S.tmr[rid];return m&&nrm(a)?(m.stops||[]).find(x=>x.active!==false&&vu(STP(x.n).v)===v&&nrm(STP(x.n).a)===nrm(a)):null};
 function bsOpts(g,rid,sel,ph){const m=S.tmr[rid];if(!m)return'<option value="">Choose the route first</option>';const A=(m.stops||[]).filter(x=>x.active!==false),a=A.filter(x=>vu(STP(x.n).v)===g.v),b=A.filter(x=>vu(STP(x.n).v)!==g.v),o=x=>`<option value="${esc(x.id)}" ${x.id===sel?'selected':''}>${esc(x.n)}</option>`;
@@ -3747,6 +3749,14 @@ async function verPoll(force){if(!S.me||navigator.onLine===false||VER.busy)retur
 const verNew=()=>!!(VER.newest&&VER.newest!==APP_BUILD);
 const verDoUpdate=()=>{toast('Updating to the newest app…',3000);acReload()};
 setInterval(()=>verPoll(true),1800000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)verPoll()});
+
+// ================= v117: stops of a village from every place (morning / afternoon / Timetable / children) =================
+// vgStops(village) = every stop name written anywhere for that village, once each. Used to suggest morning stops in the afternoon list and afternoon stops in the morning list.
+function vgStops(v){v=vu(v);const out=[],add=(a,src)=>{a=String(a||'').trim();if(!a||nrm(a)===nrm(v))return;if(!out.some(o=>nrm(o.a)===nrm(a)))out.push({a,src})};
+ try{Object.values(S.tmr||{}).forEach(m=>{if(!m)return;const L=m.kind==='return'?trRetStops(m):(m.stops||[]).filter(x=>x.active!==false);L.forEach(x=>{const p=STP(x.n);if(p.v===v)add(p.a,m.kind==='return'?'afternoon':'morning')})})}catch(e){}
+ try{const B=busDoc(),R=((B.season==='summer'||B.season==='winter')?B[B.season]:(B.cust[B.season]||{})).routes||{};Object.keys(R).forEach(r=>((R[r]||{}).stops||[]).forEach(x=>{if(vu(x.n)===v)add(x.lm,'Timetable')}))}catch(e){}
+ try{allStudents().forEach(s=>{if(vu(s.village)===v)add(bsKidStop(s),'child')})}catch(e){}
+ return out}
 
 // ================= v97: Student feedback survey (village visits): plan, staff lists, results =================
 // fvp/main = the saved plan (summary), fvp/p~{staffId}~{date} = one staff member's list for a day, fvs/{studentId} = visit result
@@ -6499,7 +6509,7 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
-const APP_BUILD='due-v116';
+const APP_BUILD='due-v117';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
