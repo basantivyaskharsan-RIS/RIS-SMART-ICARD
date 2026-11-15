@@ -558,7 +558,8 @@ function renderBars(){const el=$('#bars');if(!el)return;let h='';
  if(S.saveFail)h+='<div class="bar-red"><b>⛔ Data is not being saved!</b><span class="grow">The last change was not saved. Check the network or try later. Until it is fixed, please keep a backup.</span>'+(isAdmin()?'<button class="btn sm" data-bk="1">Take backup</button>':'')+'</div>';
  if(isAdmin()&&S.ready){const m=S.meta.backup||{},n=allStudents().length,old=!m.at||(Date.now()-m.at)/864e5>7;
   if(n&&((m.chg||0)>=3||old))h+=`<div class="bar-yel"><span class="grow">${m.at?`⚠ Since the last backup <b>${m.chg||0}</b> changes have been made${(Date.now()-m.at)/864e5>7?' (and more than 7 days have passed)':''}.`:'⚠ No backup has been taken yet.'} Take a backup.</span><button class="btn sm" data-bk="1">Take backup</button></div>`}
- el.innerHTML=h;el.querySelectorAll('[data-bk]').forEach(b=>b.onclick=()=>backupDialog())}
+ if(S.me&&verNew())h='<div class="bar-yel"><span class="grow">⬆ <b>A newer version of the app is ready</b> ('+esc(VER.newest)+'). This phone has '+esc(APP_BUILD)+'.</span><button class="btn sm" data-up="1">Update now</button></div>'+h;
+ el.innerHTML=h;el.querySelectorAll('[data-bk]').forEach(b=>b.onclick=()=>backupDialog());el.querySelectorAll('[data-up]').forEach(b=>b.onclick=verDoUpdate)}
 
 // ---- activity counters (for the admin's progress report)
 async function bump(field){if(!S.me)return;const key=S.me.id+'_'+today();
@@ -761,12 +762,12 @@ function viewForgot(){const v=$('#view');
  $('#g_no').onclick=()=>{L.mode='login';viewLogin()}}
 
 // ---- entering / leaving the app
-function enterApp(){S.hold=false;L.mode='login';S.tab=NAVMODE()==='new'?'home':tabsFor()[0][0];S.grp=null;subAll();S.ready=true;renderAll(true);renderBars()}
+function enterApp(){S.hold=false;L.mode='login';S.tab=NAVMODE()==='new'?'home':tabsFor()[0][0];S.grp=null;subAll();S.ready=true;renderAll(true);renderBars();setTimeout(()=>verPoll(true),1500)}
 function topLogout(){if(isAdmin()&&allStudents().length){choose('Would you like to back up your data before logging out?',[{t:'Back up and log out',f:async()=>{await doBackup(false);doLogout()}},{t:'Without backup',c:'sec',f:doLogout},{t:'Cancel',c:'sec'}])}else doLogout()}
 function doLogout(){try{if(FB)FB.auth.signOut()}catch(e){}S.isOwner=false;clearData();S.me=null;L.cat='';L.sid='';L.mode='login';S.ready=false;S.hold=false;renderAll(true);renderBars()}
 function renderTop(){const t=$('#topBtns');if(!t)return;document.body.classList.remove('lgp');if(!S.me){t.innerHTML='';return}
- t.innerHTML=`<span class="chip ok" id="tbSess" title="Session — tap" style="display:flex;flex-direction:column;justify-content:center;line-height:1.2;padding:3px 10px;cursor:pointer"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.me.name)} · ${esc(catLabel(S.me.cat))}</span><b style="font-size:12px;white-space:nowrap">📅 ${esc((S.settings&&S.settings.session)||'')}</b></span><button id="tbSrch" title="Search">🔍</button>${isAdmin()?'<button id="tbSet" title="Settings">⚙</button>':''}<button id="tbPw" title="Change password">🔑</button><button id="tbOut" title="Log out">⎋<span class="lbl"> Log out</span></button>`;
- $('#tbSess').onclick=sessDialog;$('#tbSrch').onclick=globalSearch;$('#tbPw').onclick=()=>viewChangePw(false);if($('#tbSet'))$('#tbSet').onclick=()=>{S.hold=false;S.tab='settings';renderAll(true)};$('#tbOut').onclick=topLogout}
+ t.innerHTML=`<span class="chip ok" id="tbSess" title="Session — tap" style="display:flex;flex-direction:column;justify-content:center;line-height:1.2;padding:3px 10px;cursor:pointer"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.me.name)} · ${esc(catLabel(S.me.cat))}</span><b style="font-size:12px;white-space:nowrap">📅 ${esc((S.settings&&S.settings.session)||'')} <span style="font-weight:400;opacity:.8">· ${esc(APP_BUILD.replace(/^due-/,''))}</span></b></span><button id="tbSrch" title="Search">🔍</button>${isAdmin()?'<button id="tbSet" title="Settings">⚙</button>':''}<button id="tbPw" title="Change password">🔑</button>${verNew()?`<button id="tbUp" title="New version ${esc(VER.newest)} — tap to update" style="background:#f59e0b;color:#000;font-weight:700">⬆<span class="lbl"> Update</span></button>`:''}<button id="tbOut" title="Log out">⎋<span class="lbl"> Log out</span></button>`;
+ $('#tbSess').onclick=sessDialog;$('#tbSrch').onclick=globalSearch;$('#tbPw').onclick=()=>viewChangePw(false);if($('#tbSet'))$('#tbSet').onclick=()=>{S.hold=false;S.tab='settings';renderAll(true)};$('#tbOut').onclick=topLogout;if($('#tbUp'))$('#tbUp').onclick=verDoUpdate}
 
 // ================= Student data writes =================
 const STX=['gender','cat2','mother','stopno','spec','sc','tmp','elder','pd','nobus','att','lm','mroute','mstop','np','rret','sret','gname','xn','r2on','depdiff','emg'];
@@ -893,7 +894,7 @@ function viewSpecial(){const v=$('#view'),G=navGroups(),R=reqGroup(),all=R?[...G
  const wire=()=>{v.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go,b.dataset.k||grpOf(b.dataset.go)));
   v.querySelectorAll('[data-fv]').forEach(b=>b.onclick=()=>{const a=favGet(),i=a.indexOf(b.dataset.fv);if(i<0)a.push(b.dataset.fv);else a.splice(i,1);favSet(a);viewSpecial()})};
  if(S.tab==='home'){const nm=(S.me&&(S.me.name||S.me.id))||'';
-  v.innerHTML=`<div class="hm"><div class="hmh"><small>Welcome</small><b>${esc(nm)}</b></div><input type="search" class="hms" id="hm_q" placeholder="🔍 Search any menu or tab — e.g. phone, route, fee, marks slip…" autocomplete="off" value="${esc(MN.hq||'')}"><div id="hm_r2"></div>${annBox()}${blkBox()}${pvBox()}<button class="hmq" id="hm_pc" style="background:#0e7490">🖨 Print Center</button>${R&&R.n?`<button class="hmq" id="hm_r">📨 ${R.n} request(s) waiting</button>`:''}<div id="hm_b"><h4>Where do you want to go?</h4><div class="hmg">${G.map(g=>`<button class="hmt" style="--c:${NGCOL[g.k]||'#334155'}" data-g="${g.k}"><span class="hi">${g.ic}</span><b>${esc(g.nm)}</b><span>${esc(g.hint||'')}</span>${g.n?`<i>${g.n}</i>`:''}</button>`).join('')}</div></div></div>`;
+  v.innerHTML=`<div class="hm"><div class="hmh" style="position:relative"><small>Welcome</small><b>${esc(nm)}</b><span class="small muted" style="position:absolute;right:0;top:2px">App ${esc(APP_BUILD.replace(/^due-/,''))}${verNew()?' · <b style="color:#b45309">new: '+esc(VER.newest.replace(/^due-/,''))+'</b>':''}</span></div><input type="search" class="hms" id="hm_q" placeholder="🔍 Search any menu or tab — e.g. phone, route, fee, marks slip…" autocomplete="off" value="${esc(MN.hq||'')}"><div id="hm_r2"></div>${annBox()}${blkBox()}${pvBox()}<button class="hmq" id="hm_pc" style="background:#0e7490">🖨 Print Center</button>${R&&R.n?`<button class="hmq" id="hm_r">📨 ${R.n} request(s) waiting</button>`:''}<div id="hm_b"><h4>Where do you want to go?</h4><div class="hmg">${G.map(g=>`<button class="hmt" style="--c:${NGCOL[g.k]||'#334155'}" data-g="${g.k}"><span class="hi">${g.ic}</span><b>${esc(g.nm)}</b><span>${esc(g.hint||'')}</span>${g.n?`<i>${g.n}</i>`:''}</button>`).join('')}</div></div></div>`;
   hmSearch(v,all,grpOf);if($('#hm_r'))$('#hm_r').onclick=()=>go('grp','req');if($('#hm_pc'))$('#hm_pc').onclick=()=>go('pcenter','off');v.querySelectorAll('[data-ann]').forEach(b=>b.onclick=()=>annAck(b.dataset.ann));
   v.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{const g=G.find(x=>x.k===b.dataset.g);if(g.leaves.length===1)go(g.leaves[0].id,g.k);else go('grp',g.k)})}
  else if(S.tab==='grp'){const g=all.find(x=>x.k===S.grp);if(!g){S.tab='home';return viewSpecial()}
@@ -3737,6 +3738,16 @@ function bsOpen(){trEnsure();const G=bsGroups(),M=trRoutes('morning');if(!G.leng
    rows.push({v:g.v,rid,kids:g.kids.map(s=>{const k=d.querySelector('[data-ks="'+i+'|'+s.id+'"]'),val=(k&&k.value)||ds;return{id:s.id,key:key(val||'')}})})});
   if(!rows.length)return toast('Tick a village and choose its route.',4000);const n=await bsApply(rows);if(n&&S.tab==='brs')viewBrs()}}
 
+// ================= v115: new-version notice on the main screen =================
+// After login the app looks (at start, after a long pause, and every 30 minutes) at the file on the server. If it is newer than this phone's copy, an orange "Update" button
+// appears in the top bar next to Log out and a yellow bar appears on the main screen. The version number of this phone is shown in the top bar too.
+let verAt=0;
+async function verPoll(force){if(!S.me||navigator.onLine===false||VER.busy)return;if(!force&&Date.now()-verAt<600000)return;verAt=Date.now();VER.busy=true;
+ try{const r=await fetch(location.pathname+'?nocache='+Date.now(),{cache:'no-store'});const tx=await r.text();const m=tx.match(new RegExp('const APP_BUILD'+'=\\x27([^\\x27]+)\\x27'));if(m){const was=VER.newest;VER.newest=m[1];if(was!==VER.newest){renderTop();renderBars();if(S.tab==='home'){try{refresh()}catch(e){}}}}}catch(e){}VER.busy=false}
+const verNew=()=>!!(VER.newest&&VER.newest!==APP_BUILD);
+const verDoUpdate=()=>{toast('Updating to the newest app…',3000);acReload()};
+setInterval(()=>verPoll(true),1800000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)verPoll()});
+
 // ================= v97: Student feedback survey (village visits): plan, staff lists, results =================
 // fvp/main = the saved plan (summary), fvp/p~{staffId}~{date} = one staff member's list for a day, fvs/{studentId} = visit result
 const FV={ld:false,tab:'plan',main:null,my:{},res:{},day:'',gen:null,pool:null,all:null,pd:null,cfg:{D:4,st:540,en:780,m:10,hop:15,P:3,noSun:true}};
@@ -6488,7 +6499,7 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
-const APP_BUILD='due-v114';
+const APP_BUILD='due-v115';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
