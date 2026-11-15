@@ -3683,26 +3683,59 @@ ${sh.map(s=>{const ms=s.mroute&&S.tmr[s.mroute],rr=s.mroute&&brRetFor(s.mroute);
  $('#bt_ok').onclick=()=>{if(!BR.pick.size)return toast('Tick the children first.',3000);const np={},vi=$('#bt_v').value,r=$('#bt_r').value,st=$('#bt_s').value;if(vi)np.village=vi;if(r)np.mroute=r;if(st)np.mstop=st;if(r&&!st)return toast('Choose the arrival stop too.',3500);if(!Object.keys(np).length)return toast('Choose what to change.',3000);const ids=[...BR.pick];
   const d=$('#dlg');d.hidden=false;d.innerHTML=`<div><b>Change ${ids.length} children?</b><div class="small" style="margin:6px 0">${vi?'Village → <b>'+esc(vi)+'</b><br>':''}${r?'Arrival route → <b>'+esc((S.tmr[r]||{}).name)+'</b><br>':''}${st?'Arrival stop → <b>'+esc(((S.tmr[r]||{}).stops||[]).find(x=>x.id===st).n)+'</b><br>':''}Departure route and stop follow automatically (a child with "different stop" is not touched). The class is backed up first.</div><div class="row"><button class="btn sec grow" id="bc_n">Cancel</button><button class="btn grow" id="bc_y">Change</button></div></div>`;$('#bc_n').onclick=unbusy;$('#bc_y').onclick=async()=>{const n=await brApply(ids,np,'bulk route & stop');if(n){BR.pick=new Set();viewBrs()}}}}
 
-// ================= v113: Suggest route & stop from the village =================
-// For children whose village is filled but arrival route / stop is missing: look in the saved morning routes for stops of that village.
-// One route + one stop → filled in the list; otherwise the admin chooses. Nothing is saved until "Apply". Children who already have a different route are left alone.
+// ================= v113/v114: Suggest route & stop from the village (and from each child's own earlier stop) =================
+// Children with a village but no arrival route / stop. Per village: the route is found from the saved morning routes; the stop list holds the route's stops of that village
+// PLUS stops already written earlier (the child's own stop name, Timetable stops of the child's route) - those are added to the route when chosen.
+// A child can have its own stop (each row); empty = same as the village row. Route can be saved without a stop. Nothing is saved until Apply.
+function bsKidStop(s){const v=vu(s.village);let a='';const raw=String(s.stop1||'').trim();
+ if(raw){const p=STP(raw);if(p.v)a=p.v===v?p.a:'';else a=raw}
+ else if(String(s.stopno||'').trim()&&String(s.route1||'').trim()){try{const L=dueStops(routeNum(s.route1)),x=L[(parseInt(s.stopno,10)||0)-1];if(x&&vu(x.n)===v)a=String(x.lm||'').trim()}catch(e){}}
+ a=String(a||'').trim();return nrm(a)&&nrm(a)!==nrm(v)?a:''}
 function bsGroups(){const M=trRoutes('morning'),g={};allStudents().filter(s=>!s.nobus&&vu(s.village)&&(!s.mroute||!s.mstop)).forEach(s=>{const v=vu(s.village);(g[v]=g[v]||[]).push(s)});
- return Object.keys(g).sort().map(v=>{const cand=[];M.forEach(m=>(m.stops||[]).forEach(x=>{if(x.active!==false&&vu(STP(x.n).v)===v)cand.push({rid:m.id,sid:x.id})}));
-  const rts=[...new Set(cand.map(c=>c.rid))];return{v,kids:g[v],cand,rts,rid:rts.length===1?rts[0]:'',sid:(rts.length===1&&cand.length===1)?cand[0].sid:''}})}
-async function bsApply(rows){const edits={};let n=0,skip=0,warn=0;
- rows.forEach(r=>r.kids.forEach(kd=>{const s=findStudent(kd.id);if(!s)return;if(s.mroute&&s.mroute!==r.rid){skip++;return}
-  const p=brPlan(s,{mroute:r.rid,mstop:r.sid});if(p.warn)warn++;const e={};Object.keys(p.e).forEach(k2=>{if(String(s[k2]===undefined?'':s[k2])!==String(p.e[k2]))e[k2]=p.e[k2]});if(Object.keys(e).length){edits[s.id]=e;n++}}));
- if(!n){toast('Nothing to change.'+(skip?' '+skip+' child(ren) already have another route.':''),5000);return 0}
- busy('Saving…');try{await scBulk(edits,'village → route & stop');unbusy();toast('Saved ✔ '+n+' child(ren)'+(skip?' · '+skip+' left as they were (other route)':'')+(warn?' · '+warn+' without a matching departure stop':''),warn||skip?9000:4000);return n}catch(e){unbusy();toast('Not saved — '+errMsg(e),7000);return 0}}
+ return Object.keys(g).sort().map(v=>{const rts=[];M.forEach(m=>{if((m.stops||[]).some(x=>x.active!==false&&vu(STP(x.n).v)===v))rts.push(m.id)});
+  const pool=[],add=a=>{a=String(a||'').trim();if(a&&nrm(a)!==nrm(v)&&!pool.some(p=>nrm(p)===nrm(a)))pool.push(a)};
+  g[v].forEach(s=>add(bsKidStop(s)));
+  [...new Set(g[v].map(s=>routeNum(s.route1)).filter(Boolean))].forEach(rn=>{try{dueStops(rn).forEach(x=>{if(vu(x.n)===v)add(x.lm)})}catch(e){}});
+  return{v,kids:g[v],rts,pool,rid:rts.length===1?rts[0]:''}})}
+const bsMatch=(rid,v,a)=>{const m=S.tmr[rid];return m&&nrm(a)?(m.stops||[]).find(x=>x.active!==false&&vu(STP(x.n).v)===v&&nrm(STP(x.n).a)===nrm(a)):null};
+function bsOpts(g,rid,sel,ph){const m=S.tmr[rid];if(!m)return'<option value="">Choose the route first</option>';const A=(m.stops||[]).filter(x=>x.active!==false),a=A.filter(x=>vu(STP(x.n).v)===g.v),b=A.filter(x=>vu(STP(x.n).v)!==g.v),o=x=>`<option value="${esc(x.id)}" ${x.id===sel?'selected':''}>${esc(x.n)}</option>`;
+ const np=g.pool.map((p,i)=>[p,i]).filter(([p])=>!bsMatch(rid,g.v,p));
+ return`<option value="">${ph}</option>`+a.map(o).join('')+(np.length?'<optgroup label="Written earlier — will be added to this route">'+np.map(([p,i])=>`<option value="n${i}" ${('n'+i)===sel?'selected':''}>＋ ${esc(g.v+' - '+p)}</option>`).join('')+'</optgroup>':'')+(b.length?'<optgroup label="Other stops of this route">'+b.map(o).join('')+'</optgroup>':'')}
+function bsKidSel(g,rid,s){const a=bsKidStop(s);if(!a||!rid)return'';const x=bsMatch(rid,g.v,a);if(x)return x.id;const i=g.pool.findIndex(p=>nrm(p)===nrm(a));return i>=0?'n'+i:''}
+function bsDefSel(g,rid){const m=S.tmr[rid];if(!m)return'';const a=(m.stops||[]).filter(x=>x.active!==false&&vu(STP(x.n).v)===g.v),np=g.pool.map((p,i)=>[p,i]).filter(([p])=>!bsMatch(rid,g.v,p));return a.length+np.length===1?(a.length?a[0].id:'n'+np[0][1]):''}
+async function bsMake(rid,v,a,cache){const key=rid+'|'+nrm(a);if(cache[key])return cache[key];const m=S.tmr[rid];const nm=stJoin(v,a),dup=(m.stops||[]).find(x=>nrm(x.n)===nrm(nm)||(vu(STP(x.n).v)===v&&nrm(STP(x.n).a)===nrm(a)));if(dup)return cache[key]=dup.id;
+ const id=trSid(),now=Date.now(),by=S.me.name||S.me.id,nd=Object.assign({},m,{stops:(m.stops||[]).concat([{id,n:nm,t:'',active:true}]),upd:now,by});nd.hist=(m.hist||[]).concat([{at:now,by,act:'Stop added: '+nm}]);
+ await save(()=>S.db.doc('tmr/'+rid).set(nd));S.tmr[rid]=nd;logHist('edit',{id:'',name:nm,cls:''},'Transport stop added: '+nm+' ('+m.name+')');return cache[key]=id}
+// rows: [{v, rid, kids:[{id, key}]}]  key = '' | stop id | {a:'stop text to add'}
+async function bsApply(rows){const edits={},cache={};let n=0,skip=0,warn=0,made=0,nost=0;busy('Saving…');
+ try{for(const r of rows){for(const kd of r.kids){const s=findStudent(kd.id);if(!s)continue;if(s.mroute&&s.mroute!==r.rid){skip++;continue}
+   let sid='';if(kd.key&&typeof kd.key==='object'){const before=Object.keys(cache).length;sid=await bsMake(r.rid,r.v,kd.key.a,cache);if(Object.keys(cache).length>before)made++}else sid=kd.key||'';
+   if(!sid&&!s.mstop)nost++;
+   const np=sid?{mroute:r.rid,mstop:sid}:{mroute:r.rid};const p=brPlan(s,np);if(p.warn)warn++;const e={};Object.keys(p.e).forEach(k2=>{if(String(s[k2]===undefined?'':s[k2])!==String(p.e[k2]))e[k2]=p.e[k2]});if(Object.keys(e).length){edits[s.id]=e;n++}}}
+  if(!n){unbusy();toast('Nothing to change.'+(skip?' '+skip+' child(ren) already have another route.':''),5000);return 0}
+  await scBulk(edits,'village → route & stop');unbusy();
+  toast('Saved ✔ '+n+' child(ren)'+(made?' · '+made+' new stop(s) added to the route':'')+(nost?' · '+nost+' without a stop yet':'')+(skip?' · '+skip+' left as they were (other route)':'')+(warn?' · '+warn+' without a matching departure stop':''),9000);return n}
+ catch(e){unbusy();toast('Not saved — '+errMsg(e),7000);return 0}}
 function bsOpen(){trEnsure();const G=bsGroups(),M=trRoutes('morning');if(!G.length)return toast('No child with a village is missing a route or stop.',4500);
- const stOpt=(rid,v,sel)=>{const m=S.tmr[rid];if(!m)return'<option value="">Choose the route first</option>';const A=(m.stops||[]).filter(x=>x.active!==false),a=A.filter(x=>vu(STP(x.n).v)===v),b=A.filter(x=>vu(STP(x.n).v)!==v),o=x=>`<option value="${esc(x.id)}" ${x.id===sel?'selected':''}>${esc(x.n)}</option>`;return'<option value="">Choose the stop</option>'+a.map(o).join('')+(b.length?'<optgroup label="Other stops of this route">'+b.map(o).join('')+'</optgroup>':'')};
+ const kidRow=(g,i,s)=>`<div class="row" style="gap:6px;margin-top:3px;align-items:center"><div class="small" style="flex:0 0 38%;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(tc(s.name))} <span class="muted">${esc(s.cls)}</span></div><select data-ks="${i}|${esc(s.id)}" class="grow" style="min-width:0"></select></div>`;
  const d=$('#dlg');d.hidden=false;
- d.innerHTML=`<div style="max-height:88vh;overflow:auto"><b>Route & stop from the village (${G.length} villages)</b><p class="small muted" style="margin:4px 0 8px">The list is made from your saved morning routes. A tick means the app is sure; choose the rest yourself. Nothing is saved until you press Apply. Children who already have another route are not touched.</p>${G.map((g,i)=>{const st=g.rid&&g.sid?'<span class="ok">ready</span>':g.rts.length>1?'<span class="warn">village is on '+g.rts.length+' routes — choose</span>':g.rts.length===1?'<span class="warn">choose the stop</span>':'<span class="warn">no saved route has this village</span>';
-  return `<div class="box" style="margin:4px 0"><div class="row" style="gap:8px"><input type="checkbox" data-gk="${i}" ${g.rid&&g.sid?'checked':''} style="width:22px;height:22px"><div class="grow"><b>${esc(g.v)}</b> <span class="small muted">${g.kids.length} child(ren)</span><div class="small">${st}</div></div></div><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:4px"><select data-gr="${i}" class="grow"><option value="">Arrival route</option>${M.map(m=>`<option value="${esc(m.id)}" ${m.id===g.rid?'selected':''}>${esc(m.name)}</option>`).join('')}</select><select data-gs="${i}" class="grow">${stOpt(g.rid,g.v,g.sid)}</select></div></div>`}).join('')}<div class="row" style="margin-top:8px"><button class="btn sec grow" id="bs_n">Cancel</button><button class="btn grow" id="bs_y">Apply</button></div></div>`;
- d.querySelectorAll('[data-gr]').forEach(sel=>sel.onchange=()=>{const i=sel.dataset.gr;d.querySelector('[data-gs="'+i+'"]').innerHTML=stOpt(sel.value,G[i].v,'')});
- d.querySelectorAll('[data-gs]').forEach(sel=>sel.onchange=()=>{const i=sel.dataset.gs,c=d.querySelector('[data-gk="'+i+'"]');if(sel.value)c.checked=true});
+ d.innerHTML=`<div style="max-height:88vh;overflow:auto"><b>Route & stop from the village (${G.length} villages)</b><p class="small muted" style="margin:4px 0 8px">Stops that were written earlier for the children or in the Timetable are offered too (marked ＋); they are added to the route when you Apply. Open "Children" to give each child its own stop; an empty child row means the stop chosen for the village. A route can be saved without a stop. Nothing is saved until Apply. Children who already have another route are not touched.</p>${G.map((g,i)=>`<div class="box" style="margin:4px 0"><div class="row" style="gap:8px"><input type="checkbox" data-gk="${i}" style="width:22px;height:22px"><div class="grow"><b>${esc(g.v)}</b> <span class="small muted">${g.kids.length} child(ren)</span><div class="small" data-gt="${i}"></div></div></div><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:4px"><select data-gr="${i}" class="grow"><option value="">Arrival route</option>${M.map(m=>`<option value="${esc(m.id)}" ${m.id===g.rid?'selected':''}>${esc(m.name)}</option>`).join('')}</select><select data-gs="${i}" class="grow"></select></div><details style="margin-top:4px"><summary class="small">Children (${g.kids.length}) — each child's own stop</summary>${g.kids.map(s=>kidRow(g,i,s)).join('')}</details></div>`).join('')}<div class="row" style="margin-top:8px"><button class="btn sec grow" id="bs_n">Cancel</button><button class="btn grow" id="bs_y">Apply</button></div></div>`;
+ const q=(a,i)=>d.querySelector('['+a+'="'+i+'"]');
+ const status=i=>{const g=G[i],rid=q('data-gr',i).value,ds=q('data-gs',i).value,ks=[...d.querySelectorAll('[data-ks^="'+i+'|"]')];const t=q('data-gt',i);
+  if(!rid){t.innerHTML=g.rts.length>1?'<span class="warn">village is on '+g.rts.length+' routes — choose the route</span>':'<span class="warn">no saved route has this village — choose the route</span>';return}
+  const miss=ks.filter(k=>!k.value&&!ds).length;t.innerHTML=miss?(miss===ks.length?'<span class="warn">choose the stop (or save only the route)</span>':'<span class="warn">'+miss+' child(ren) without a stop — they get the route only</span>'):'<span class="ok">ready</span>'};
+ const fill=(i,resetKids)=>{const g=G[i],rid=q('data-gr',i).value;q('data-gs',i).innerHTML=bsOpts(g,rid,'','Stop for the village'); if(rid)q('data-gs',i).value=bsDefSel(g,rid);
+  d.querySelectorAll('[data-ks^="'+i+'|"]').forEach(k=>{const id=k.dataset.ks.split('|')[1],s=findStudent(id);k.innerHTML=bsOpts(g,rid,'','Same as village');if(rid)k.value=bsKidSel(g,rid,s)});
+  const ck=q('data-gk',i);ck.checked=!!rid&&(!!q('data-gs',i).value||[...d.querySelectorAll('[data-ks^="'+i+'|"]')].every(k=>k.value));status(i)};
+ G.forEach((g,i)=>fill(i));
+ d.querySelectorAll('[data-gr]').forEach(sel=>sel.onchange=()=>fill(+sel.dataset.gr));
+ d.querySelectorAll('[data-gs]').forEach(sel=>sel.onchange=()=>{const i=sel.dataset.gs;if(q('data-gr',i).value)q('data-gk',i).checked=true;status(i)});
+ d.querySelectorAll('[data-ks]').forEach(sel=>sel.onchange=()=>{const i=sel.dataset.ks.split('|')[0];if(q('data-gr',i).value)q('data-gk',i).checked=true;status(i)});
  $('#bs_n').onclick=unbusy;
- $('#bs_y').onclick=async()=>{const rows=[];d.querySelectorAll('[data-gk]').forEach(c=>{if(!c.checked)return;const i=c.dataset.gk,rid=d.querySelector('[data-gr="'+i+'"]').value,sid=d.querySelector('[data-gs="'+i+'"]').value;if(rid&&sid)rows.push({kids:G[i].kids,rid,sid})});if(!rows.length)return toast('Tick a village and choose its route and stop.',4000);const n=await bsApply(rows);if(n&&S.tab==='brs')viewBrs()}}
+ $('#bs_y').onclick=async()=>{const rows=[];d.querySelectorAll('[data-gk]').forEach(c=>{if(!c.checked)return;const i=+c.dataset.gk,g=G[i],rid=q('data-gr',i).value;if(!rid)return;const ds=q('data-gs',i).value;
+   const key=v=>/^n\d+$/.test(v)?{a:g.pool[+v.slice(1)]}:v;
+   rows.push({v:g.v,rid,kids:g.kids.map(s=>{const k=d.querySelector('[data-ks="'+i+'|'+s.id+'"]'),val=(k&&k.value)||ds;return{id:s.id,key:key(val||'')}})})});
+  if(!rows.length)return toast('Tick a village and choose its route.',4000);const n=await bsApply(rows);if(n&&S.tab==='brs')viewBrs()}}
 
 // ================= v97: Student feedback survey (village visits): plan, staff lists, results =================
 // fvp/main = the saved plan (summary), fvp/p~{staffId}~{date} = one staff member's list for a day, fvs/{studentId} = visit result
@@ -6455,7 +6488,7 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
-const APP_BUILD='due-v113';
+const APP_BUILD='due-v114';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
