@@ -1674,7 +1674,7 @@ function viewProvs(){const v=$('#view');if(!S.me)return;const adm=isAdmin(),tch=
 // ================= DUE-23 phase 2: Attendance (daily, monthly, class-group calendar) =================
 // att/{classKey}__{YYYY-MM} = {cls, month, d:{ 'DD': { childKey: 'P'|'A'|'L' } }}.  Calendar of special days per class group: meta/attcal.
 // Child keys: student id (A / B), 'x_'+student id (C: extra class), PV-xx-nnnn (D: provisional).
-const ATS={tab:'daily',cls:'',date:'',month:'',grp:'pre',gm:'',draft:null,sig:'',ld:{}};
+const ATS={auto:false,rg:null,tab:'daily',cls:'',date:'',month:'',grp:'pre',gm:'',draft:null,sig:'',ld:{}};
 const ATC={A:['A','On PSP portal'],T:['T','Not on PSP list'],B:['B','Sitting in this class for improvement'],C:['C','Extra class'],D:['D','Provisional (not permanent students)']};
 const ATT_T=[['n','Normal day',1],['hol','Holiday',0],['pk','Picnic',0],['ex','Exam',0],['hd','Half day',1],['ot','Other',1]];
 const ATT_SH={sun:'·',hol:'H',pk:'Pk',ex:'Ex',hd:'½',ot:'*',n:''};
@@ -1700,7 +1700,14 @@ async function attEnsure(m,force){const key='L'+m;if(!force&&ATS.ld[key]&&Date.n
  else await Promise.all(myCls().map(async c=>{try{const s=await S.db.doc('att/'+attId(c,m)).get();if(s.exists)S.att[attId(c,m)]=s.data()}catch(e){}}));
  ATS.ld[key]=Date.now()}
 function attDirty(){return ATS.tab==='daily'&&ATS.draft&&attSig(ATS.draft)!==ATS.sig}
-function attLoadDraft(){const d=attDoc(ATS.cls,ATS.date.slice(0,7)).d||{};ATS.draft=Object.assign({},d[ATS.date.slice(8)]||{});ATS.sig=attSig(ATS.draft)}
+function attLoadDraft(){const d=attDoc(ATS.cls,ATS.date.slice(0,7)).d||{};ATS.draft=Object.assign({},d[ATS.date.slice(8)]||{});ATS.auto=false;
+ if(!Object.keys(ATS.draft).length&&!attCan(ATS.date)&&attDay(ATS.cls,ATS.date).cnt){attRoster(ATS.cls).forEach(r=>{ATS.draft[r.k]='P';ATS.draft[r.k+'~']='P'});ATS.auto=Object.keys(ATS.draft).length>0}
+ ATS.sig=attSig(ATS.draft)}
+// v158: session keys: k = morning, k+'~' = afternoon, k+'#' / k+'~#' = leave reason (M medical, O other)
+function attSet(key,v,rs){const D=ATS.draft;if(!v)delete D[key];else D[key]=v;if(v==='L'&&rs)D[key+'#']=rs;else delete D[key+'#']}
+function attSB(k,s,ro){const key=s==='p'?k+'~':k,v=ATS.draft[key]||'',rs=ATS.draft[key+'#']||'';const lab=v==='L'?(rs==='M'?'Med':rs==='O'?'Oth':'L'):(v||'–');const bg=v==='P'?'#1f8a3b':v==='A'?'#d33':v==='L'?'#e8a200':'';
+ return `<div style="text-align:center"><div class="small muted">${s==='m'?'Morning':'Afternoon'}</div><button type="button" class="btn ${v?'':'sec'} sm at-s" data-k="${esc(k)}" data-s="${s}" style="min-width:58px;${bg?'background:'+bg+';':''}" ${ro?'disabled':''}>${lab}</button></div>`}
+function attOpts(key,name,done){choose('<b>'+esc(name)+'</b><div class="small muted">'+(key.endsWith('~')?'Afternoon':'Morning')+'</div>',[{t:'Present (P)',f:()=>{attSet(key,'P');done()}},{t:'Absent (A)',f:()=>{attSet(key,'A');done()}},{t:'Leave',f:()=>{attSet(key,'L');done()}},{t:'Medical',f:()=>{attSet(key,'L','M');done()}},{t:'Other',f:()=>{attSet(key,'L','O');done()}},{t:'Cancel',c:'sec'}])}
 const ATT_FROM='2026-10-01';
 function attCan(date){if(date>today())return'You cannot mark a future date.';if(date<ATT_FROM)return'Attendance starts from 1 October 2026.';if(attOnlyMe()&&date<attAddDays(today(),-1)&&!((S.meta.attcal||{}).bf))return'You can change only today and yesterday. Ask the admin for older dates.';return''}
 async function attSave(){const cls=ATS.cls,date=ATS.date,m=date.slice(0,7),dd=date.slice(8),er=attCan(date);if(er)return toast(er,5000);if(!attDay(cls,date).cnt)return toast('No attendance is taken on this day.',4000);
@@ -1708,46 +1715,49 @@ async function attSave(){const cls=ATS.cls,date=ATS.date,m=date.slice(0,7),dd=da
   const base=JSON.parse(JSON.stringify((fresh.d||{})[dd]||{})),was=(attDoc(cls,m).d||{})[dd]||{},day=Object.assign({},base);
   new Set([...Object.keys(ATS.draft),...Object.keys(was)]).forEach(k=>{const a=ATS.draft[k],b=was[k];if(a===b)return;if(a)day[k]=a;else delete day[k]});
   const d=Object.assign({},fresh.d||{});if(Object.keys(day).length)d[dd]=day;else delete d[dd];const doc={cls,month:m,d,upd:Date.now(),by:S.me.id};
-  await save(()=>S.db.doc('att/'+attId(cls,m)).set(doc));S.att[attId(cls,m)]=doc;const c={P:0,A:0,L:0};Object.values(day).forEach(v=>{if(c[v]!==undefined)c[v]++});
+  await save(()=>S.db.doc('att/'+attId(cls,m)).set(doc));S.att[attId(cls,m)]=doc;const c={P:0,A:0,L:0};Object.keys(day).filter(k=>!/[~#]$/.test(k)).forEach(k=>{const v=day[k];if(c[v]!==undefined)c[v]++});
   logHist('att',{cls},'Attendance '+date+': P '+c.P+' · A '+c.A+' · L '+c.L);unbusy();attLoadDraft();toast('Attendance saved ✔',3000);viewAtt()}catch(e){unbusy();toast('Not saved — '+errMsg(e)+'. Tap Save to try again.',7000)}}
 // ---- register data for one class and month
 function attRegister(cls,m){const doc=attDoc(cls,m),days=attMonthDays(m),R=attRoster(cls),seen=new Set(R.map(r=>r.k));
- days.forEach(x=>{const dm=(doc.d||{})[String(x.n).padStart(2,'0')]||{};Object.keys(dm).forEach(k=>{if(!seen.has(k)){seen.add(k);const st=allStudents(true).find(s=>s.id===k),pv=pvAll().find(p=>p.id===k);R.push({k,name:st?st.name:pv?pv.name:(k.startsWith('x_')?(((S.xcls||{})[k.slice(2)]||{}).name||k):k),cat:k.startsWith('x_')?'C':k.startsWith('PV-')?'D':'A',sub:'No longer on the list'})}})});
+ days.forEach(x=>{const dm=(doc.d||{})[String(x.n).padStart(2,'0')]||{};Object.keys(dm).forEach(k=>{if(/[~#]$/.test(k))return;if(!seen.has(k)){seen.add(k);const st=allStudents(true).find(s=>s.id===k),pv=pvAll().find(p=>p.id===k);R.push({k,name:st?st.name:pv?pv.name:(k.startsWith('x_')?(((S.xcls||{})[k.slice(2)]||{}).name||k):k),cat:k.startsWith('x_')?'C':k.startsWith('PV-')?'D':'A',sub:'No longer on the list'})}})});
  const info=days.map(x=>attDay(cls,x.d)),td=today();
- const rows=R.map(r=>{const cells=days.map((x,i)=>{const dm=(doc.d||{})[String(x.n).padStart(2,'0')]||{};if(!info[i].cnt)return{s:ATT_SH[info[i].t]||'',k:'h'};const v=dm[r.k];return v?{s:v,k:v}:{s:x.d<=td?'–':'',k:'x'}});
-  const P=cells.filter(c=>c.k==='P').length,A=cells.filter(c=>c.k==='A').length,L=cells.filter(c=>c.k==='L').length,t=P+A+L;return Object.assign({},r,{cells,P,A,L,pc:t?Math.round(P*100/t):null})});
+ const rows=R.map(r=>{const cells=days.map((x,i)=>{const dm=(doc.d||{})[String(x.n).padStart(2,'0')]||{};if(!info[i].cnt)return{s:ATT_SH[info[i].t]||'',k:'h'};const v=dm[r.k],a=dm[r.k+'~'],sl=(q,rr)=>q==='L'&&rr?rr:q;if(!v)return{s:x.d<=td?'–':'',k:'x'};const a2=a||v;if(a2===v)return{s:sl(v,dm[r.k+'#']),k:v};return{s:sl(v,dm[r.k+'#'])+'/'+sl(a2,dm[r.k+'~#']),k:'m2',m:v,a:a2}});
+  const cn=ch=>cells.reduce((q,c)=>q+(c.k===ch?1:c.k==='m2'?((c.m===ch?.5:0)+(c.a===ch?.5:0)):0),0),P=cn('P'),A=cn('A'),L=cn('L'),t=P+A+L;return Object.assign({},r,{cells,P,A,L,pc:t?Math.round(P*100/t):null})});
  return{days,info,rows}}
 // ---- the screen
-function attTabs(){const T=[['daily','Daily'],['month','Monthly register']].concat(isAdmin()?[['cal','Calendar'],['sum','Summary']]:[]);return `<div class="row" style="gap:6px;flex-wrap:wrap">${T.map(t=>`<button class="btn ${ATS.tab===t[0]?'':'sec'} sm" data-at="${t[0]}">${t[1]}</button>`).join('')}</div>`}
+function attTabs(){const T=[['daily','Daily'],['month','Monthly register'],['reg','Registers (class / school / village / route)']].concat(isAdmin()?[['cal','Calendar'],['sum','Summary']]:[]);return `<div class="row" style="gap:6px;flex-wrap:wrap">${T.map(t=>`<button class="btn ${ATS.tab===t[0]?'':'sec'} sm" data-at="${t[0]}">${t[1]}</button>`).join('')}</div>`}
 function viewAtt(){const v=$('#view');if(!S.me)return;const cl=attClasses();
  if(!isAdmin()&&!leadU()&&S.me.cat!=='teacher'){v.innerHTML='<p class="muted">Not available.</p>';return}
  if(!cl.length){v.innerHTML='<h2>Attendance</h2><p class="muted">No class is available.</p>';return}
  if(!cl.includes(ATS.cls)){const hv=new Set(allStudents().map(s=>s.cls));ATS.cls=cl.find(c=>hv.has(c))||cl[0];ATS.draft=null}if(!ATS.date)ATS.date=today();if(!ATS.month)ATS.month=today().slice(0,7);if(!ATS.gm)ATS.gm=today().slice(0,7);
  if(!isAdmin()&&(ATS.tab==='cal'||ATS.tab==='sum'))ATS.tab='daily';
- const m=ATS.tab==='daily'?ATS.date.slice(0,7):ATS.tab==='month'?ATS.month:ATS.tab==='sum'?ATS.date.slice(0,7):ATS.gm;
+ const m=ATS.tab==='daily'?ATS.date.slice(0,7):ATS.tab==='month'?ATS.month:ATS.tab==='reg'?(ATS.rg&&ATS.rg.month||today().slice(0,7)):ATS.tab==='sum'?ATS.date.slice(0,7):ATS.gm;
  v.innerHTML=`<h2>Attendance</h2>${attTabs()}<div id="at_body"><p class="muted small" style="margin-top:10px">Loading…</p></div>`;
  v.querySelectorAll('[data-at]').forEach(b=>b.onclick=()=>attGo(()=>{ATS.tab=b.dataset.at;ATS.draft=null;viewAtt()}));
- const draw=()=>{if(S.tab!=='attd')return;const b=$('#at_body');if(!b)return;({daily:attDaily,month:attMonth,cal:attCal,sum:attSum})[ATS.tab](b)};
+ const draw=()=>{if(S.tab!=='attd')return;const b=$('#at_body');if(!b)return;({daily:attDaily,month:attMonth,reg:attRegs,cal:attCal,sum:attSum})[ATS.tab](b)};
  attEnsure(m).then(draw).catch(e=>{const b=$('#at_body');if(b)b.innerHTML='<p class="bad small">Could not load attendance: '+esc(errMsg(e))+'</p>'})}
 function attGo(fn){if(attDirty()){choose('<b>Unsaved attendance</b><br>This will be lost if you continue.',[{t:'Discard and continue',f:()=>{ATS.draft=null;fn()}},{t:'Stay here',c:'sec'}])}else fn()}
 const attClsSel=(id)=>`<select id="${id}" style="width:auto">${attClasses().map(c=>`<option ${c===ATS.cls?'selected':''}>${esc(c)}</option>`).join('')}</select>`;
 function attDaily(b){const cls=ATS.cls,date=ATS.date;if(!ATS.draft)attLoadDraft();const info=attDay(cls,date),R=attRoster(cls),er=attCan(date),dirty=attDirty(),ro=!!er||!info.cnt;
- const cnt={};R.forEach(r=>cnt[r.cat]=(cnt[r.cat]||0)+1);const c={P:0,A:0,L:0,N:0};R.forEach(r=>{const x=ATS.draft[r.k];if(x)c[x]++;else c.N++});
+ const cnt={};R.forEach(r=>cnt[r.cat]=(cnt[r.cat]||0)+1);const c={P:0,A:0,L:0,N:0},ca={P:0,A:0,L:0,N:0};R.forEach(r=>{const x=ATS.draft[r.k];if(x)c[x]++;else c.N++;const y=ATS.draft[r.k+'~'];if(y)ca[y]++;else ca.N++});
  const bc={n:'#e3f4df;color:#1f6b2c',hd:'#e3f4df;color:#1f6b2c',ot:'#e3f4df;color:#1f6b2c',hol:'#fff1b8;color:#7a5a00',sun:'#e8e8e8;color:#555',pk:'#fff1b8;color:#7a5a00',ex:'#fbe0e0;color:#8a1f1f'}[info.t]||'#eee';
  const grp=cat=>R.filter(r=>cat==='A'?(r.cat==='A'||r.cat==='T'):r.cat===cat);let n=0;
- const sec=cat=>{const L=grp(cat);if(!L.length)return'';return `<div class="grp" style="margin-top:8px"><b>${cat} — ${esc(ATC[cat][1])} (${L.length})</b></div>`+L.map((r,i)=>{const x=ATS.draft[r.k]||'';return `<div class="row" style="padding:6px 0;border-bottom:1px solid var(--line);${r.cat==='B'?'background:#fff6c2;border-radius:6px;padding-inline:6px;':''}"><div class="grow"><div class="nm"><span class="sn">${i+1}.</span> ${esc(r.name)}${r.cat==='T'?' <span class="pill">T</span>':''}</div>${r.sub?`<div class="small muted">${esc(r.sub)}</div>`:''}</div>${['P','A','L'].map(k=>`<button type="button" class="btn ${x===k?'':'sec'} sm at-b" data-k="${esc(r.k)}" data-v="${k}" style="min-width:38px;${x===k?(k==='P'?'background:#1f8a3b;':k==='A'?'background:#d33;':'background:#e8a200;'):''}" ${ro?'disabled':''}>${k}</button>`).join('')}</div>`}).join('')};
+ const sec=cat=>{const L=grp(cat);if(!L.length)return'';return `<div class="grp" style="margin-top:8px"><b>${cat} — ${esc(ATC[cat][1])} (${L.length})</b></div>`+L.map((r,i)=>{const x=ATS.draft[r.k]||'';return `<div class="row" style="padding:6px 0;border-bottom:1px solid var(--line);${r.cat==='B'?'background:#fff6c2;border-radius:6px;padding-inline:6px;':''}"><div class="grow"><div class="nm"><span class="sn">${i+1}.</span> ${esc(r.name)}${r.cat==='T'?' <span class="pill">T</span>':''}</div>${r.sub?`<div class="small muted">${esc(r.sub)}</div>`:''}</div>${attSB(r.k,'m',ro)}${attSB(r.k,'p',ro)}</div>`}).join('')};
  b.innerHTML=`<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px">${attClsSel('at_c')}<input type="date" id="at_d" value="${date}" max="${today()}" min="${attOnlyMe()&&!((S.meta.attcal||{}).bf)?attAddDays(today(),-1):ATT_FROM}" style="width:auto"></div>
 <div style="margin-top:8px;border-radius:8px;padding:6px 8px;font-weight:700;background:${bc}">${esc(attDayName(info.t))}${info.n&&info.t!=='sun'?' — '+esc(info.n):''} <span class="small" style="font-weight:400">· ${esc((AD_GRP.find(g=>g[0]===adGrpOf(cls))||[0,''])[1])}${info.cnt?'':' · attendance is not taken'}</span></div>
 ${er?`<p class="small bad" style="margin:6px 0">${esc(er)}</p>`:''}
-<div class="box" style="margin-top:8px"><div class="small">${['A','T','B','C','D'].filter(k=>cnt[k]).map(k=>`<b>${k}</b> ${cnt[k]}`).join(' · ')||'No children'} <span class="muted">(filling is optional)</span></div><div class="small muted" style="margin-top:4px">Present ${c.P} · Absent ${c.A} · Leave ${c.L} · Not marked ${c.N}${dirty?' · <b class="bad">● unsaved</b>':''}</div></div>
+<div class="box" style="margin-top:8px"><div class="small">${['A','T','B','C','D'].filter(k=>cnt[k]).map(k=>`<b>${k}</b> ${cnt[k]}`).join(' · ')||'No children'} <span class="muted">(tap = Absent / Present · long-press = Leave, Medical, Other)</span></div><div class="small muted" style="margin-top:4px">Morning: P ${c.P} · A ${c.A} · L ${c.L} · not marked ${c.N}<br>Afternoon: P ${ca.P} · A ${ca.A} · L ${ca.L} · not marked ${ca.N}${ATS.auto&&!dirty?' · <b>Default P filled — press Save</b>':''}${dirty?' · <b class="bad">● unsaved</b>':''}</div></div>
 ${info.cnt?`<div class="box">${['A','B','C','D'].map(sec).join('')||'<p class="muted small">No children in this class.</p>'}</div>
-<div class="row" style="margin-top:8px"><button class="btn sec" id="at_all" ${ro?'disabled':''}>All present</button><button class="btn grow" id="at_s" ${ro||!dirty?'disabled':''}>Save attendance</button></div>`:''}`;
+<div class="row" style="margin-top:8px"><button class="btn sec" id="at_all" ${ro?'disabled':''}>All present</button><button class="btn grow" id="at_s" ${ro||(!dirty&&!ATS.auto)?'disabled':''}>Save attendance</button></div>`:''}`;
  $('#at_c').onchange=e=>attGo(()=>{ATS.cls=e.target.value;ATS.draft=null;viewAtt()});$('#at_d').onchange=e=>attGo(()=>{ATS.date=e.target.value||today();ATS.draft=null;viewAtt()});
- b.querySelectorAll('.at-b').forEach(x=>x.onclick=()=>{const k=x.dataset.k,v=x.dataset.v;if(ATS.draft[k]===v)delete ATS.draft[k];else ATS.draft[k]=v;const y=window.scrollY;attDaily(b);window.scrollTo(0,y)});
- const al=$('#at_all');if(al)al.onclick=()=>{R.forEach(r=>{if(!ATS.draft[r.k])ATS.draft[r.k]='P'});const y=window.scrollY;attDaily(b);window.scrollTo(0,y)};
+ const redo=()=>{const y=window.scrollY;attDaily(b);window.scrollTo(0,y)};
+ b.querySelectorAll('.at-s').forEach(x=>{let tm=null,lp=false;const key=()=>x.dataset.s==='p'?x.dataset.k+'~':x.dataset.k;const st=()=>{lp=false;clearTimeout(tm);tm=setTimeout(()=>{lp=true;const r=R.find(q=>q.k===x.dataset.k);attOpts(key(),r?r.name:'',redo)},500)},en=()=>clearTimeout(tm);
+  x.addEventListener('touchstart',st,{passive:true});x.addEventListener('touchend',en);x.addEventListener('touchmove',en);x.addEventListener('mousedown',st);x.addEventListener('mouseup',en);x.addEventListener('mouseleave',en);x.addEventListener('contextmenu',e=>e.preventDefault());
+  x.onclick=()=>{if(lp){lp=false;return}const k=key(),v=ATS.draft[k];if(v==='A')attSet(k,'P');else attSet(k,'A');redo()}});
+ const al=$('#at_all');if(al)al.onclick=()=>{R.forEach(r=>{if(!ATS.draft[r.k])ATS.draft[r.k]='P';if(!ATS.draft[r.k+'~'])ATS.draft[r.k+'~']='P'});const y=window.scrollY;attDaily(b);window.scrollTo(0,y)};
  const sv=$('#at_s');if(sv)sv.onclick=attSave}
 function attMonth(b){const cls=ATS.cls,m=ATS.month,G=attRegister(cls,m),days=G.days;
- const cat=k=>G.rows.filter(r=>k==='A'?(r.cat==='A'||r.cat==='T'):r.cat===k);const colr={P:'#1f8a3b',A:'#d33',L:'#e8a200',x:'#999'};
+ const cat=k=>G.rows.filter(r=>k==='A'?(r.cat==='A'||r.cat==='T'):r.cat===k);const colr={P:'#1f8a3b',A:'#d33',L:'#e8a200',x:'#999',m2:'#c60'};
  const head=`<tr><th>Name</th>${days.map((x,i)=>`<th style="${G.info[i].cnt?'':'background:#fde9a8'}">${x.n}</th>`).join('')}<th>P</th><th>A</th><th>L</th><th>%</th></tr>`;
  const sec=k=>{const L=cat(k);if(!L.length)return'';return `<tr><td colspan="${days.length+5}" style="background:#eaf2fc;text-align:left;font-weight:700">${k} — ${esc(ATC[k][1])} (${L.length})</td></tr>`+L.map(r=>`<tr><td style="text-align:left;white-space:nowrap">${esc(r.name)}${r.cat==='T'?' <b>T</b>':''}</td>${r.cells.map(c=>`<td style="${c.k==='h'?'background:#fff1b8;color:#7a5a00;':'color:'+(colr[c.k]||'#000')+';font-weight:700;'}">${esc(c.s)}</td>`).join('')}<td>${r.P}</td><td>${r.A}</td><td>${r.L}</td><td>${r.pc===null?'–':r.pc}</td></tr>`).join('')};
  const tot=k=>{const L=cat(k);if(!L.length)return null;const P=L.reduce((a,r)=>a+r.P,0),A=L.reduce((a,r)=>a+r.A,0),Lv=L.reduce((a,r)=>a+r.L,0),t=P+A+Lv;return{k,n:L.length,P,A,L:Lv,pc:t?Math.round(P*100/t):null}};
@@ -1759,6 +1769,37 @@ function attMonth(b){const cls=ATS.cls,m=ATS.month,G=attRegister(cls,m),days=G.d
 <div class="row" style="margin-top:8px"><button class="btn sec grow" id="at_x">Excel / PDF</button></div>`;
  $('#at_c').onchange=e=>{ATS.cls=e.target.value;viewAtt()};$('#at_m').onchange=e=>{ATS.month=e.target.value||today().slice(0,7);viewAtt()};
  $('#at_x').onclick=()=>exportTableDialog('Attendance_'+cls.replace(/[^A-Za-z0-9]+/g,'_')+'_'+m,[[cls+' '+m,['No.','Name','Cat'].concat(days.map(x=>String(x.n)),['P','A','L','%']),G.rows.map((r,i)=>[i+1,r.name,r.cat].concat(r.cells.map(c=>c.s),[r.P,r.A,r.L,r.pc===null?'':r.pc]))]])}
+
+// ---- v158: Registers - class / school / village / route wise (blank or filled), with PSP type + Keep/Remove tick column
+function attRegs(b){const R=ATS.rg||(ATS.rg={type:'class',val:'',month:today().slice(0,7),blank:false});const adm=isAdmin()||leadU();if(!adm)R.type='class';
+ const sts=allStudents().filter(s=>!s.left);
+ const vil=[...new Set(sts.map(s=>vu(s.village)).filter(Boolean))].sort();
+ const dep=[...new Set(sts.map(s=>s.route1).filter(Boolean))].sort((a,c)=>String(a).localeCompare(String(c),'en',{numeric:true}));
+ let arr=[];try{arr=trRoutes('morning')||[]}catch(e){}
+ const opts=R.type==='class'?attClasses().map(c=>[c,c]):R.type==='village'?vil.map(v=>[v,v]):R.type==='route'?dep.map(n=>['d:'+n,'Departure route '+n]).concat(arr.map(r=>['a:'+r.id,'Arrival: '+(r.name||r.no||r.id)])):[];
+ if(R.type!=='school'&&!opts.some(o=>o[0]===R.val))R.val=opts.length?opts[0][0]:'';
+ const m=R.month,days=attMonthDays(m),cache={},get=c=>cache[c]||(cache[c]=attRegister(c,m));
+ const row=s=>{const g=get(s.cls),r=g.rows.find(q=>q.k===s.id);return r?Object.assign({},r,{father:s.father||'',cls:s.cls}):{k:s.id,name:s.name,cat:s.tmp?'T':'A',father:s.father||'',cls:s.cls,cells:days.map(()=>({s:'',k:'x'})),P:0,A:0,L:0}};
+ let G=[];
+ if(R.type==='class'&&R.val)G=[{t:'Class '+R.val,rows:get(R.val).rows.map(r=>{const st=allStudents(true).find(s=>s.id===r.k);return Object.assign({},r,{father:st?st.father||'':'',cls:R.val})})}];
+ else if(R.type==='school')G=attClasses().map(c=>({t:'Class '+c,rows:get(c).rows.map(r=>{const st=allStudents(true).find(s=>s.id===r.k);return Object.assign({},r,{father:st?st.father||'':'',cls:c})})})).filter(g=>g.rows.length);
+ else if(R.type==='village'&&R.val)G=[{t:'Village '+R.val,rows:sts.filter(s=>vu(s.village)===R.val).sort((a,c)=>cmpClass(a.cls,c.cls)||String(a.name).localeCompare(String(c.name),'en',{sensitivity:'base'})).map(row)}];
+ else if(R.type==='route'&&R.val){const [k,v]=[R.val.slice(0,1),R.val.slice(2)];G=[{t:(R.val.startsWith('d:')?'Departure route ':'Arrival route ')+(opts.find(o=>o[0]===R.val)||[0,v])[1],rows:sts.filter(s=>k==='d'?String(s.route1)===v:s.mroute===v).sort((a,c)=>cmpClass(a.cls,c.cls)||String(a.name).localeCompare(String(c.name),'en',{sensitivity:'base'})).map(row)}]}
+ const TY={A:'PSP',T:'Not in PSP',B:'Sitting',C:'Extra',D:'Prov.'},kr=r=>pwOf(r.k)?'Remove (portal list)':'☐ Keep  ☐ Remove';
+ const cell=c=>R.blank?(c.k==='h'?c.s:''):(c.k==='x'?(c.s==='–'?'–':''):c.s);
+ const H=['No.','Name','Father','Class','Type'].concat(days.map(x=>String(x.n)),R.blank?[]:['P','A','L'],['Keep / Remove']);
+ const body=g=>g.rows.map((r,i)=>[i+1,r.name,r.father||'',r.cls||'',TY[r.cat]||''].concat(r.cells.map(cell),R.blank?[]:[r.P,r.A,r.L],[kr(r)]));
+ const nKids=G.reduce((a,g)=>a+g.rows.length,0);
+ b.innerHTML=`<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px"><select id="rg_t" style="width:auto">${[['class','Class-wise']].concat(adm?[['school','School-wise'],['village','Village-wise'],['route','Route-wise']]:[]).map(x=>`<option value="${x[0]}" ${x[0]===R.type?'selected':''}>${x[1]}</option>`).join('')}</select>
+${R.type!=='school'?`<select id="rg_v" style="width:auto;max-width:60%">${opts.map(o=>`<option value="${esc(o[0])}" ${o[0]===R.val?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`:''}
+<input type="month" id="rg_m" value="${m}" min="2026-10" style="width:auto"></div>
+<label class="row" style="gap:8px;margin-top:8px"><input type="checkbox" id="rg_b" ${R.blank?'checked':''} style="width:22px;height:22px"> Empty register (no attendance filled; holidays still marked)</label>
+<div class="small muted" style="margin-top:6px">${nKids} children · Type: PSP = on PSP portal list · Not in PSP · Sitting (for improvement) · Extra class · Prov. = provisional. The Keep / Remove column is for ticking on paper; children already in the portal-removal list show "Remove". Nothing is changed in the app from here.</div>
+<div class="row" style="margin-top:8px"><button class="btn grow" id="rg_x" ${nKids?'':'disabled'}>Excel / PDF</button></div>
+${G.map(g=>`<div class="box" style="margin-top:8px;overflow:auto"><b>${esc(g.t)} (${g.rows.length})</b><table class="t" style="font-size:11px;text-align:center;min-width:${days.length*24+380}px"><tr>${H.map(h=>`<th>${esc(h)}</th>`).join('')}</tr>${body(g).slice(0,400).map(r=>`<tr>${r.map((c,i)=>`<td style="${i===1||i===2?'text-align:left;white-space:nowrap':''}">${esc(c)}</td>`).join('')}</tr>`).join('')}</table></div>`).join('')||'<p class="muted small">No children.</p>'}`;
+ $('#rg_t').onchange=e=>{R.type=e.target.value;R.val='';viewAtt()};const sv=$('#rg_v');if(sv)sv.onchange=e=>{R.val=e.target.value;viewAtt()};
+ $('#rg_m').onchange=e=>{R.month=e.target.value||today().slice(0,7);viewAtt()};$('#rg_b').onchange=e=>{R.blank=e.target.checked;viewAtt()};
+ $('#rg_x').onclick=()=>{const nm=new Set();exportTableDialog('Register_'+(R.type)+'_'+m,G.map(g=>{let n=g.t.replace(/[\\\/?*\[\]:]/g,' ').slice(0,28),q=n,z=2;while(nm.has(q))q=n.slice(0,25)+' '+z++;nm.add(q);return[q,H,body(g)]}))}}
 // ---- calendar (admin)
 function attCal(b){const g=ATS.grp,m=ATS.gm,days=attMonthDays(m),ent=((((S.meta.attcal||{}).days||{})[g])||{});
  const lead=(days[0].w+6)%7,cells=[];for(let i=0;i<lead;i++)cells.push('<td></td>');
@@ -7050,7 +7091,7 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
-const APP_BUILD='due-v157';
+const APP_BUILD='due-v158';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
