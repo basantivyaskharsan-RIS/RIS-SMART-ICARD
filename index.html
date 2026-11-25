@@ -597,7 +597,7 @@ function subAll(){clearSubs(unsubs);XL.loaded=new Set();XL.extraTh=new Set();con
  else{const mc=myCls().slice(0,30);if(mc.length)unsubs.push(S.db.collectionIn('thumbs','cls',mc).onSnapshot(sn=>{const ex={};XL.extraTh.forEach(id=>{if(S.thumbs[id])ex[id]=S.thumbs[id]});S.thumbs=ex;sn.docs.forEach(d=>S.thumbs[d.id]=d.data());refresh()},onErr))}
  if(all)unsubs.push(S.db.collection('contacts').onSnapshot(sn=>{S.contacts={};sn.docs.forEach(d=>S.contacts[d.id]=d.data());refresh()},()=>{}));
  if(isAdmin()||(S.me&&S.me.cat==='acct'))unsubs.push(S.db.collection('priv').onSnapshot(sn=>{S.priv={};sn.docs.forEach(d=>S.priv[d.id]=d.data());refresh()},()=>{}));
- ['sib','dupok','design','villages','bus','gok','tasks','feesys','exam','susp','bexam','rollfmt','routes','lead','lh','rank','stoplinks','rextra','dprot','moncfg','ttab','pfb','attcal','syl','sigs','navmap','tform'].forEach(k=>unsubs.push(S.db.doc('meta/'+k).onSnapshot(sn=>{S.meta[k]=sn.exists?sn.data():null;if(k==='sib'||k==='gok')DP.dirty=true;refresh()},()=>{})));
+ ['sib','dupok','design','villages','bus','gok','tasks','feesys','exam','susp','bexam','rollfmt','routes','lead','lh','rank','stoplinks','rextra','dprot','moncfg','ttab','pfb','attcal','syl','sigs','navmap','navlab','tform'].forEach(k=>unsubs.push(S.db.doc('meta/'+k).onSnapshot(sn=>{S.meta[k]=sn.exists?sn.data():null;if(k==='sib'||k==='gok')DP.dirty=true;refresh()},()=>{})));
  unsubs.push(S.db.collection('staff').onSnapshot(sn=>{S.staff={};sn.docs.forEach(d=>S.staff[d.id]=d.data());syncMe();refresh()},onErr));
  unsubs.push(S.db.doc('meta/backup').onSnapshot(sn=>{S.meta.backup=sn.exists?sn.data():null;renderBars()},onErr));
  if(isAdmin()){unsubs.push(sc('activity','activity'));unsubs.push(sc('admins','admins'));purgeBin()}}
@@ -890,7 +890,23 @@ function nmDlg(id){const all=navGroups();let nm=id;all.forEach(g=>g.leaves.forEa
  $('#nm_c').onclick=unbusy;
  $('#nm_s').onclick=async()=>{const g=Object.assign({},M);d.querySelectorAll('[data-nk]').forEach(c=>{const k=c.dataset.nk;let a=String(g[k]||'').split(',').filter(x=>x&&x!==id);if(c.checked&&!nat(k))a.push(id);if(a.length)g[k]=a.join(',');else delete g[k]});
   try{await save(()=>S.db.doc('meta/navmap').set({g,at:Date.now(),by:(S.me&&S.me.id)||''}));unbusy();toast('Saved ✔ — menu updated',3000);refresh()}catch(e){toast('Not saved: '+errMsg(e),7000)}}}
-function navGroups(){const old=navGroupsOld();if(NAVMODE()==='old'){const ex=navExtra();if(ex.length){let m=old.find(g=>g.k==='more');if(!m){m={k:'more',ic:'☰',nm:'More',leaves:[],n:0};old.push(m)}ex.forEach(l=>{if(!m.leaves.some(y=>y.id===l.id))m.leaves.push(l)})}return old}
+const navLab=()=>((S.meta&&S.meta.navlab)||{}).n||{};
+const navCan=()=>!!S.me&&(isAdmin()||['acad','mgmt'].includes(S.me.cat));
+function navGroups(){const G=navGroupsRaw(),N=navLab();navObsInit();if(Object.keys(N).length)G.forEach(g=>{g.leaves=g.leaves.map(l=>N[l.id]?Object.assign({},l,{nm:N[l.id]}):l)});return G}
+function navOrig(id){let nm='';navGroupsRaw().forEach(g=>g.leaves.forEach(l=>{if(l.id===id&&!nm)nm=l.nm}));return nm}
+function navObsInit(){if(window.__navObs)return;const v=document.getElementById('view');if(!v||!window.MutationObserver)return;window.__navObs=1;let busyF=0;new MutationObserver(()=>{if(busyF)return;const N=navLab(),nn=N[S.tab];if(!nn)return;const h=v.querySelector('h2');if(!h)return;const o=navOrig(S.tab);if(!o||o===nn)return;const t=h.firstChild;if(t&&t.nodeType===3&&t.nodeValue.trim().startsWith(o)){busyF=1;t.nodeValue=t.nodeValue.replace(o,nn);busyF=0}}).observe(v,{childList:true})}
+function navNames(save){const d={n:save,at:Date.now(),by:(S.me&&S.me.id)||''};return S.db.doc('meta/navlab').set(d)}
+function nmMenu(id){if(!navCan())return;const nm=navGroups().reduce((a,g)=>a||((g.leaves.find(l=>l.id===id)||{}).nm),'')||id,orig=navOrig(id),N=navLab(),d=$('#dlg');d.hidden=false;
+ const inG=S.grp&&String(navMap()[S.grp]||'').split(',').includes(id);
+ d.innerHTML=`<div><b>${esc(nm)}</b>${orig&&orig!==nm?`<div class="small muted">Original name: ${esc(orig)}</div>`:''}<div class="row" style="flex-direction:column;gap:6px;margin-top:8px"><button class="btn" id="nl_r">✏️ Rename</button><button class="btn sec" id="nl_s">⧉ Show in other groups</button>${inG?'<button class="btn sec" id="nl_x">Remove from this group</button>':''}${N[id]?'<button class="btn sec" id="nl_o">Back to original name</button>':''}<button class="btn sec" id="nl_c">Cancel</button></div></div>`;
+ $('#nl_c').onclick=unbusy;
+ const wr=async n=>{try{await save(()=>navNames(n));S.meta.navlab={n};unbusy();toast('Saved ✔ — name changed everywhere',3000);refresh()}catch(e){toast('Not saved: '+errMsg(e),7000)}};
+ $('#nl_s').onclick=()=>{unbusy();nmDlg(id)};
+ $('#nl_r').onclick=()=>{unbusy();askText('New name for “'+nm+'”',nm,v=>{v=String(v||'').trim();if(!v)return toast('Name cannot be empty.',3000);const n=Object.assign({},N);if(v===orig)delete n[id];else n[id]=v.slice(0,60);wr(n)})};
+ if($('#nl_o'))$('#nl_o').onclick=()=>{const n=Object.assign({},N);delete n[id];wr(n)};
+ if($('#nl_x'))$('#nl_x').onclick=async()=>{const M=Object.assign({},navMap());const a=String(M[S.grp]||'').split(',').filter(x=>x&&x!==id);if(a.length)M[S.grp]=a.join(',');else delete M[S.grp];try{await save(()=>S.db.doc('meta/navmap').set({g:M,at:Date.now(),by:(S.me&&S.me.id)||''}));unbusy();toast('Removed from this group ✔',3000);refresh()}catch(e){toast('Not saved: '+errMsg(e),7000)}}}
+function navLP(root){root.querySelectorAll('.hmb[data-go]').forEach(b=>{if(b.__lp)return;b.__lp=1;let t=0,f=0;const c=()=>{clearTimeout(t)};b.addEventListener('pointerdown',()=>{f=0;c();t=setTimeout(()=>{f=1;nmMenu(b.dataset.go)},650)});['pointerup','pointercancel','pointerleave','pointermove'].forEach(e=>b.addEventListener(e,c));b.addEventListener('contextmenu',e=>{e.preventDefault()});b.addEventListener('click',e=>{if(f){e.stopImmediatePropagation();e.preventDefault();f=0}},true)})}
+function navGroupsRaw(){const old=navGroupsOld();if(NAVMODE()==='old'){const ex=navExtra();if(ex.length){let m=old.find(g=>g.k==='more');if(!m){m={k:'more',ic:'☰',nm:'More',leaves:[],n:0};old.push(m)}ex.forEach(l=>{if(!m.leaves.some(y=>y.id===l.id))m.leaves.push(l)})}return old}
  const L={};old.forEach(g=>g.leaves.forEach(l=>{if(!L[l.id])L[l.id]=l}));navExtra().forEach(l=>{if(!L[l.id])L[l.id]=l});const used=new Set(),G=[];
  NG.forEach(([k,ic,nm,hint,ids0])=>{const ids=ids0.concat(String(navMap()[k]||'').split(',').filter(x=>x&&!ids0.includes(x)));const lv=ids.filter(i=>L[i]).map(i=>L[i]);if(!lv.length)return;lv.forEach(l=>used.add(l.id));G.push({k,ic,nm,hint,leaves:lv,n:0})});
  const rest=Object.keys(L).filter(i=>!used.has(i));if(rest.length){let m=G.find(g=>g.k==='mgmt');if(!m){m={k:'mgmt',ic:'⚙️',nm:'Management & Settings',hint:'Settings, tasks, checks',leaves:[],n:0};G.push(m)}rest.forEach(i=>m.leaves.push(L[i]))}
@@ -922,8 +938,8 @@ function hmSearch(v,all,grpOf){const q=$('#hm_q'),out=$('#hm_r2'),bod=$('#hm_b')
  q.oninput=run;run()}
 function viewSpecial(){const v=$('#view'),G=navGroups(),R=reqGroup(),all=R?[...G,R]:G,fav=favGet();const bd=c=>c?`<span class="badge" style="position:static;margin-left:6px">${c}</span>`:'';
  const grpOf=id=>(all.find(g=>g.k===S.grp&&g.leaves.some(l=>l.id===id))||all.find(g=>g.leaves.some(l=>l.id===id))||{}).k||'';
- const row=(l,k)=>`<div class="hmr"><button class="hmb" data-go="${esc(l.id)}" data-k="${esc(k)}">${esc(l.nm)}${bd(l.n)}<em>›</em></button><button class="hmf" data-fv="${esc(l.id)}" aria-label="Favourite">${fav.includes(l.id)?'⭐':'☆'}</button>${k&&isAdmin()?`<button class="hmf" data-nm="${esc(l.id)}" aria-label="Show in more groups" title="Show in more groups">⧉</button>`:''}</div>`;
- const wire=()=>{v.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go,b.dataset.k||grpOf(b.dataset.go)));
+ const row=(l,k)=>`<div class="hmr"><button class="hmb" data-go="${esc(l.id)}" data-k="${esc(k)}">${esc(l.nm)}${bd(l.n)}<em>›</em></button><button class="hmf" data-fv="${esc(l.id)}" aria-label="Favourite">${fav.includes(l.id)?'⭐':'☆'}</button>${k&&navCan()?`<button class="hmf" data-nm="${esc(l.id)}" aria-label="Show in more groups" title="Show in more groups">⧉</button>`:''}</div>`;
+ const wire=()=>{if(navCan())navLP(v);v.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go,b.dataset.k||grpOf(b.dataset.go)));
   v.querySelectorAll('[data-nm]').forEach(b=>b.onclick=()=>nmDlg(b.dataset.nm));
   v.querySelectorAll('[data-fv]').forEach(b=>b.onclick=()=>{const a=favGet(),i=a.indexOf(b.dataset.fv);if(i<0)a.push(b.dataset.fv);else a.splice(i,1);favSet(a);viewSpecial()})};
  if(S.tab==='home'){const nm=(S.me&&(S.me.name||S.me.id))||'';
@@ -7777,7 +7793,7 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
-const APP_BUILD='due-v230';
+const APP_BUILD='due-v231';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
