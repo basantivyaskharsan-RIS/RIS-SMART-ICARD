@@ -1759,7 +1759,7 @@ function attRegister(cls,m){const doc=attDoc(cls,m),days=attMonthDays(m),R=attRo
   const cn=ch=>cells.reduce((q,c)=>q+(c.k===ch?1:c.k==='m2'?((c.m===ch?.5:0)+(c.a===ch?.5:0)):0),0),P=cn('P'),A=cn('A'),L=cn('L'),t=P+A+L;return Object.assign({},r,{cells,P,A,L,pc:t?Math.round(P*100/t):null})});
  return{days,info,rows}}
 // ---- the screen
-function attTabs(){const T=[['daily','Daily'],['reg','Monthly register'],['month','Totals A/B/C/D']].concat(isAdmin()?[['cal','Calendar'],['sum','Summary']]:[]);return `<div class="row" style="gap:6px;flex-wrap:wrap">${T.map(t=>`<button class="btn ${ATS.tab===t[0]?'':'sec'} sm" data-at="${t[0]}">${t[1]}</button>`).join('')}</div>`}
+function attTabs(){const T=[['daily','Daily'],['reg','Monthly register'],['cnt','Count'],['month','Totals A/B/C/D']].concat(isAdmin()?[['cal','Calendar'],['sum','Summary']]:[]);return `<div class="row" style="gap:6px;flex-wrap:wrap">${T.map(t=>`<button class="btn ${ATS.tab===t[0]?'':'sec'} sm" data-at="${t[0]}">${t[1]}</button>`).join('')}</div>`}
 function viewAtt(){const v=$('#view');if(!S.me)return;if(!AT.cfgOk&&!window.__atEns){window.__atEns=1;atCfgEnsure().then(()=>{window.__atEns=0;if(S.tab==='attd')viewAtt()})}const cl=attClasses();
  if(!isAdmin()&&!leadU()&&S.me.cat!=='teacher'){v.innerHTML='<p class="muted">Not available.</p>';return}
  if(!cl.length){v.innerHTML='<h2>Attendance</h2><p class="muted">No class is available.</p>';return}
@@ -1768,7 +1768,7 @@ function viewAtt(){const v=$('#view');if(!S.me)return;if(!AT.cfgOk&&!window.__at
  const m=ATS.tab==='daily'?ATS.date.slice(0,7):ATS.tab==='month'?ATS.month:ATS.tab==='reg'?(ATS.rg&&ATS.rg.month||today().slice(0,7)):ATS.tab==='sum'?ATS.date.slice(0,7):ATS.gm;
  v.innerHTML=`<h2>Attendance</h2>${attTabs()}<div id="at_body"><p class="muted small" style="margin-top:10px">Loading…</p></div>`;
  v.querySelectorAll('[data-at]').forEach(b=>b.onclick=()=>attGo(()=>{ATS.tab=b.dataset.at;ATS.draft=null;viewAtt()}));
- const draw=()=>{if(S.tab!=='attd')return;const b=$('#at_body');if(!b)return;({daily:attDaily,month:attMonth,reg:attRegs,cal:attCal,sum:attSum})[ATS.tab](b)};
+ const draw=()=>{if(S.tab!=='attd')return;const b=$('#at_body');if(!b)return;({daily:attDaily,month:attMonth,reg:attRegs,cal:attCal,sum:attSum,cnt:attCnt})[ATS.tab](b)};
  attEnsure(m).then(draw).catch(e=>{const b=$('#at_body');if(b)b.innerHTML='<p class="bad small">Could not load attendance: '+esc(errMsg(e))+'</p>'})}
 function attGo(fn){if(attDirty()){choose('<b>Unsaved attendance</b><br>This will be lost if you continue.',[{t:'Discard and continue',f:()=>{ATS.draft=null;fn()}},{t:'Stay here',c:'sec'}])}else fn()}
 const attClsSel=(id)=>`<select id="${id}" style="width:auto">${attClasses().map(c=>`<option ${c===ATS.cls?'selected':''}>${esc(c)}</option>`).join('')}</select>`;
@@ -1875,6 +1875,56 @@ function attSum(b){const date=ATS.date,m=date.slice(0,7),cls=attClasses();
  $('#at_d').onchange=e=>{ATS.date=e.target.value||today();viewAtt()};
  $('#at_x').onclick=()=>exportTableDialog('Attendance_summary_'+date,[[date,['Class','Day','A present','A absent','A leave','A total','B present','B total','C present','C total','D present','D total','Not marked'],rows.map(o=>[o.c,o.info.cnt?'':attDayName(o.info.t),o.A[0],o.A[1],o.A[2],o.tA||0,o.B[0],o.tB||0,o.C[0],o.tC||0,o.D[0],o.tD||0,o.info.cnt?o.N:''])]])}
 
+
+// ================= v230: attendance counts (staff + students) =================
+const CNT_M=[['d','Day'],['w','Week'],['m','Month'],['q','Quarter'],['y','Year']];
+function cntRange(m,d){const y=+d.slice(0,4),mo=+d.slice(5,7),P=n=>String(n).padStart(2,'0'),end=(yy,mm)=>new Date(Date.UTC(yy,mm,0)).getUTCDate();
+ if(m==='d')return[d,d];
+ if(m==='w'){const x=new Date(d+'T00:00:00Z'),wd=(x.getUTCDay()+6)%7,a=new Date(+x-wd*864e5),b=new Date(+a+6*864e5);return[a.toISOString().slice(0,10),b.toISOString().slice(0,10)]}
+ if(m==='m')return[y+'-'+P(mo)+'-01',y+'-'+P(mo)+'-'+end(y,mo)];
+ if(m==='q'){const s=Math.floor((mo-1)/3)*3+1,e=s+2;return[y+'-'+P(s)+'-01',y+'-'+P(e)+'-'+end(y,e)]}
+ return[y+'-01-01',y+'-12-31']}
+function cntDays(f,t,cap){const o=[];let x=Date.parse(f+'T00:00:00Z');const z=Date.parse(t+'T00:00:00Z');while(x<=z){const ds=new Date(x).toISOString().slice(0,10);if(ds>cap)break;o.push(ds);x+=864e5}return o}
+const cntN=n=>String(Math.round(n*10)/10);
+const cntPct=(p,b)=>b>0?Math.round(p/b*1000)/10:null;
+const cntPctTxt=x=>x==null?'–':x+'%';
+function cntCtl(mode,cd,today,idp){return `<div class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0">${CNT_M.map(([k,n])=>`<button class="btn ${mode===k?'':'sec'} sm" data-${idp}m="${k}">${n}</button>`).join('')}</div><div class="row" style="gap:6px;margin-bottom:6px"><input type="date" id="${idp}_d" value="${cd}" max="${today}" style="width:auto"></div>`}
+const cntLab=(mode,f,t)=>mode==='d'?f:f+' to '+t;
+const SA_G=[['t','Teaching staff'],['p','Peon'],['d','Drivers'],['o','Office & others']];
+const saGrp=id=>{const c=stCat((S.staff||{})[id]||{});return c==='teacher'||c==='pti'||c==='principal'?'t':c==='peon'?'p':c==='driver'||c==='attendant'?'d':'o'};
+function saCnt(v,h,today){const cd=SAT.cd||today,pm=SAT.cm||'d',[f,t]=cntRange(pm,cd),P=saRoster(),unit=pm==='d'?'':' (days)';
+ const rows=P.map(p=>{const z=saSum(p,f,t,today),b=z.pr+z.ab+z.lv+z.hd;return{p,g:saGrp(p.id),pr:z.pr,ab:z.ab,lv:z.lv,hd:z.hd,la:z.lateN,ea:z.earlyN,b,pct:cntPct(z.pr+z.hd*0.5,b)}});
+ const agg=L=>{const o={n:L.length,pr:0,ab:0,lv:0,hd:0,la:0,ea:0,b:0};L.forEach(r=>{o.pr+=r.pr;o.ab+=r.ab;o.lv+=r.lv;o.hd+=r.hd;o.la+=r.la;o.ea+=r.ea;o.b+=r.b});o.pct=cntPct(o.pr+o.hd*0.5,o.b);o.abs=o.ab+o.lv+o.hd*0.5;return o};
+ const A=agg(rows);const sumL=(nm,a)=>`${esc(nm)} · ${a.n} staff · <b>${cntPctTxt(a.pct)}</b> present · ${cntN(a.abs)} absent${unit}`;
+ const tr=r=>`<tr><td>${esc(r.p.name)}</td><td>${cntPctTxt(r.pct)}</td><td>${r.pr}</td><td>${r.ab}</td><td>${r.lv}</td><td>${r.hd}</td><td>${r.la}</td><td>${r.ea}</td></tr>`;
+ const hd='<tr><td><b>Name</b></td><td><b>%</b></td><td><b>Present</b></td><td><b>Absent</b></td><td><b>Leave</b></td><td><b>Half</b></td><td><b>Late</b></td><td><b>Early</b></td></tr>';
+ const grpRow=(nm,a)=>`<tr><td>${esc(nm)}</td><td>${cntPctTxt(a.pct)}</td><td>${a.pr}</td><td>${a.ab}</td><td>${a.lv}</td><td>${a.hd}</td><td>${a.la}</td><td>${a.ea}</td></tr>`;
+ const G=SA_G.map(([k,n])=>({k,n,L:rows.filter(r=>r.g===k)})).filter(x=>x.L.length);
+ v.innerHTML=h+cntCtl(pm,cd,today,'sc')+`<div class="box"><b>${esc(cntLab(pm,f,t))}</b><div style="margin-top:4px">${sumL('All staff',A)}</div></div>
+<details class="box"><summary><b>All groups</b> · tap to open</summary><div style="overflow:auto"><table class="t" style="font-size:12px;margin-top:6px">${hd.replace('Name','Group')}${G.map(x=>grpRow(x.n,agg(x.L))).join('')}${grpRow('Overall',A)}</table></div></details>
+${G.map(x=>{const a=agg(x.L);return `<details class="box"><summary>${sumL(x.n,a)}</summary><div style="overflow:auto"><table class="t" style="font-size:12px;margin-top:6px">${hd}${x.L.sort((p,q)=>(p.pct==null?101:p.pct)-(q.pct==null?101:q.pct)).map(tr).join('')}</table></div></details>`}).join('')}
+<div class="small muted">Present % = present days (a half day counts half) out of marked working days. Leave and absent both count as not present. Staff with no mark are Present by default.</div>
+<div class="row" style="margin-top:8px"><button class="btn sec grow" id="sc_x">Excel / PDF</button></div>`;
+ v.querySelectorAll('[data-sm]').forEach(b=>b.onclick=()=>{SAT.mode=b.dataset.sm;viewStatt()});
+ v.querySelectorAll('[data-scm]').forEach(b=>b.onclick=()=>{SAT.cm=b.dataset.scm;saDraw()});
+ $('#sc_d').onchange=e=>{const nd=e.target.value||today;const ch=nd.slice(0,4)!==cd.slice(0,4);SAT.cd=nd;if(ch)viewStatt();else saDraw()};
+ $('#sc_x').onclick=()=>exportTableDialog('Staff_attendance_count_'+f,[[cntLab(pm,f,t),['Group','Name','Present %','Present','Absent','Leave','Half','Late','Early'],rows.map(r=>[SA_G.find(z=>z[0]===r.g)[1],r.p.name,r.pct==null?'':r.pct,r.pr,r.ab,r.lv,r.hd,r.la,r.ea])]])}
+async function attCnt(b){const cd=ATS.cd||today(),pm=ATS.cm||'d',[f,t]=cntRange(pm,cd),tdy=today();b.innerHTML='<p class="muted small" style="margin-top:10px">Loading…</p>';
+ try{const ms=[...new Set(cntDays(f,t,tdy).map(d=>d.slice(0,7)))];await Promise.all(ms.map(m=>attEnsure(m)))}catch(e){b.innerHTML='<p class="bad small">Could not load: '+esc(errMsg(e))+'</p>';return}
+ if(S.tab!=='attd'||ATS.tab!=='cnt')return;
+ const days=cntDays(f,t,tdy).filter(d=>d>=ATT_FROM),unit=pm==='d'?'':' (days)';
+ const cls=attClasses().map(c=>{const R=attRoster(c),kids=R.map(r=>({r,p:0,a:0,l:0,days:0}));days.forEach(ds=>{if(!attDay(c,ds).cnt)return;const dm=(attDoc(c,ds.slice(0,7)).d||{})[ds.slice(8)]||{};kids.forEach(k=>{const mv=dm[k.r.k],av=dm[k.r.k+'~'];if(!mv&&!av)return;k.days++;[mv||av,av||mv].forEach(x=>{if(x==='P')k.p++;else if(x==='A')k.a++;else if(x==='L')k.l++})})});
+  const o={c,kids,n:kids.length,p:0,a:0,l:0};kids.forEach(k=>{o.p+=k.p;o.a+=k.a;o.l+=k.l});o.pct=cntPct(o.p,o.p+o.a+o.l);o.abs=(o.a+o.l)/2;return o}).filter(o=>o.n);
+ const T={n:0,p:0,a:0,l:0};cls.forEach(o=>{T.n+=o.n;T.p+=o.p;T.a+=o.a;T.l+=o.l});T.pct=cntPct(T.p,T.p+T.a+T.l);T.abs=(T.a+T.l)/2;
+ const line=(nm,o)=>`${esc(nm)} · ${o.n} children · <b>${cntPctTxt(o.pct)}</b> present · ${cntN(o.abs)} absent${unit}`;
+ const hd='<tr><td><b>Name</b></td><td><b>%</b></td><td><b>Present</b></td><td><b>Absent</b></td><td><b>Leave</b></td></tr>';
+ b.innerHTML=cntCtl(pm,cd,tdy,'ac')+`<div class="box"><b>${esc(cntLab(pm,f,t))}</b><div style="margin-top:4px">${line('All students',T)}</div></div>
+<details class="box"><summary><b>All classes</b> · tap to open</summary><div style="overflow:auto"><table class="t" style="font-size:12px;margin-top:6px"><tr><td><b>Class</b></td><td><b>%</b></td><td><b>Children</b></td><td><b>Absent</b></td><td><b>Leave</b></td></tr>${cls.map(o=>`<tr><td>${esc(o.c)}</td><td>${cntPctTxt(o.pct)}</td><td>${o.n}</td><td>${cntN(o.a/2)}</td><td>${cntN(o.l/2)}</td></tr>`).join('')}<tr><td><b>Whole school</b></td><td>${cntPctTxt(T.pct)}</td><td>${T.n}</td><td>${cntN(T.a/2)}</td><td>${cntN(T.l/2)}</td></tr></table></div></details>
+${cls.map(o=>`<details class="box"><summary>${line(o.c,o)}</summary><div style="overflow:auto"><table class="t" style="font-size:12px;margin-top:6px">${hd}${o.kids.slice().sort((x,y)=>(cntPct(x.p,x.p+x.a+x.l)==null?101:cntPct(x.p,x.p+x.a+x.l))-(cntPct(y.p,y.p+y.a+y.l)==null?101:cntPct(y.p,y.p+y.a+y.l))).map(k=>`<tr><td>${esc(k.r.name)}</td><td>${cntPctTxt(cntPct(k.p,k.p+k.a+k.l))}</td><td>${cntN(k.p/2)}</td><td>${cntN(k.a/2)}</td><td>${cntN(k.l/2)}</td></tr>`).join('')}</table></div></details>`).join('')}
+<div class="small muted">Only days when attendance was taken are counted (holidays and unmarked days are skipped). Morning and afternoon count half each.</div><div class="row" style="margin-top:8px"><button class="btn sec grow" id="ac_x">Excel / PDF</button></div>`;
+ b.querySelectorAll('[data-acm]').forEach(x=>x.onclick=()=>{ATS.cm=x.dataset.acm;attCnt(b)});
+ $('#ac_d').onchange=e=>{ATS.cd=e.target.value||tdy;attCnt(b)};
+ $('#ac_x').onclick=()=>exportTableDialog('Student_attendance_count_'+f,[[cntLab(pm,f,t),['Class','Name','Present %','Present days','Absent days','Leave days'],cls.reduce((a,o)=>a.concat(o.kids.map(k=>[o.c,k.r.name,cntPct(k.p,k.p+k.a+k.l)==null?'':cntPct(k.p,k.p+k.a+k.l),k.p/2,k.a/2,k.l/2])),[])]])}
 
 // ---------- Route form: Route -> Village -> Stop (primary and secondary), used in the student edit form ----------
 const RT_OTHER='__o';
@@ -3271,7 +3321,8 @@ const smCol={P:'#1f8a3a',A:'#c0392b',L:'#c99a06',M:'#c99a06',O:'#c99a06'};
 function smRow(x,ix,lock){const m=x.i.m,h=smHalf(x.i.s),tg=x.i.tags.filter(z=>z!=='On time');const b=(k,v)=>`<div style="text-align:center"><div class="small muted" style="margin-bottom:2px">${k==='m'?'Morning':'Afternoon'}</div><button type="button" data-h="${k}" ${lock?'disabled':''} style="min-width:74px;height:38px;border-radius:10px;border:1px solid #0b3d1f33;font-weight:700;font-size:16px;color:#fff;background:${lock?'#9aa5b1':smCol[v]}">${lock?'—':v}</button></div>`;
  return `<div class="row" data-mk="${esc(x.p.id)}" style="gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none"><div class="grow" style="min-width:0"><div class="nm"><span class="sn">${ix+1}.</span> <b>${esc(x.p.name)}</b></div><div class="small muted">${esc(catLabel(x.p.cat))}${x.i.r?' · In '+atT(x.i.r.ci):''}${tg.length?' · '+esc(tg.join(', ')):''}</div>${m&&(m.pb||m.rm)?`<div class="small">${m.pb?'Permitted by <b>'+esc(m.pb)+'</b>':''}${m.pb&&m.rm?' · ':''}${esc(m.rm||'')}</div>`:''}</div>${b('m',h.m)}${b('a',h.a)}</div>`}
 function saDraw(){if(S.tab!=='statt')return;const v=$('#view'),c=atCfg(),today=atDate(Date.now()),P=saRoster(),MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
- const MD=SAT.mode;let h=`<h2>Staff Attendance</h2><div class="row" style="gap:6px;margin:6px 0">${[['day','Day'],['mark','Mark'],['month','Month'],['year','Year']].map(([k,n])=>`<button class="btn ${MD===k?'':'sec'} sm grow" data-sm="${k}">${n}</button>`).join('')}</div>`;let ex=null;const re=()=>viewStatt();
+ const MD=SAT.mode;let h=`<h2>Staff Attendance</h2><div class="row" style="gap:6px;margin:6px 0">${[['day','Day'],['mark','Mark'],['month','Month'],['year','Year'],['cnt','Count']].map(([k,n])=>`<button class="btn ${MD===k?'':'sec'} sm grow" data-sm="${k}">${n}</button>`).join('')}</div>`;let ex=null;const re=()=>viewStatt();
+ if(MD==='cnt'){saCnt(v,h,today);return}
  if(MD==='day'||MD==='mark'){const ds=SAT.d,y=atDay(ds),mark=MD==='mark';
   const R=P.map(p=>{const i=saInfo(p,ds,today);let st='',cls='g',k='';
    if(i.pre){k='pre'}else if(i.m&&i.m.s!=='P'||(!i.m&&i.s==='LV')){st=SM_ST[i.s];cls=SM_CLS[i.s];k=i.s==='A'?'absent':i.s[0]==='H'?'half':'leave'}else if(i.y.off&&!i.m){k='off'}else if(i.fut){k='future'}else{k='present';st=i.r?(i.r.co?'Present':'In school'):'Present (default)'}
@@ -3315,7 +3366,7 @@ function saStaffDlg(id){const p=saRoster().find(x=>x.id===id);if(!p)return;const
  for(let d=dim;d>=1;d--){const dd=SAT.mon+'-'+String(d).padStart(2,'0');if(dd>today)continue;const i=saInfo(p,dd,today);if(i.pre)continue;const n=[];if(i.m&&i.m.s!=='P')n.push(SM_ST[i.m.s]);i.tags.filter(t=>t!=='On time').forEach(t=>n.push(t));i.L.forEach(l=>n.push(LV_T[l.ty]||l.ty));if(i.y.off&&!i.m)n.push(i.y.why);if(i.m&&i.m.pb)n.push('by '+i.m.pb);if(i.m&&i.m.rm)n.push(i.m.rm);rows.push(`<tr style="${i.y.off?'background:#fef9c3':i.ab?'background:#fee2e2':''}"><td>${esc(atFmtD(dd).slice(0,-5))}</td><td>${atT(i.r&&i.r.ci)}</td><td>${atT(i.r&&i.r.co)}</td><td class="small">${esc(n.join(', '))}</td></tr>`)}
  const d=$('#dlg');d.hidden=false;d.innerHTML=`<div style="max-height:84vh;overflow:auto"><b>${esc(p.name)} — ${esc(SAT.mon)}</b><table class="t" style="width:100%;margin-top:6px"><tr><th>Date</th><th>In</th><th>Out</th><th>Note</th></tr>${rows.join('')||'<tr><td colspan="4" class="muted">No days.</td></tr>'}</table><div class="row" style="margin-top:8px"><button class="btn sec grow" id="sd_x">Close</button></div></div>`;$('#sd_x').onclick=unbusy}
 function viewStatt(){const v=$('#view');if(!smOk()){v.innerHTML='<p class="muted">Not available.</p>';return}const today=atDate(Date.now());if(!SAT.d)SAT.d=today;if(!SAT.mon)SAT.mon=today.slice(0,7);if(!SAT.yr)SAT.yr=today.slice(0,4);
- let from,to;if(SAT.mode==='day'||SAT.mode==='mark'){from=to=SAT.d}else if(SAT.mode==='month'){from=SAT.mon+'-01';to=SAT.mon+'-31'}else{from=SAT.yr+'-01-01';to=SAT.yr+'-12-31'}
+ let from,to;if(SAT.mode==='day'||SAT.mode==='mark'){from=to=SAT.d}else if(SAT.mode==='cnt'){const y=(SAT.cd||today).slice(0,4);from=y+'-01-01';to=y+'-12-31'}else if(SAT.mode==='month'){from=SAT.mon+'-01';to=SAT.mon+'-31'}else{from=SAT.yr+'-01-01';to=SAT.yr+'-12-31'}
  if(SAT.rk!==from+'|'+to||!SAT.lv)v.innerHTML='<h2>Staff Attendance</h2><p class="muted small">Loading…</p>';
  saLoad(from,to).then(saDraw).catch(e=>{v.innerHTML='<h2>Staff Attendance</h2><p class="bad small">Could not load: '+esc(errMsg(e))+'</p>'})}
 // ---------- leave / permission applications (slv/{staffId}__{YYYYMMDD}__{type}__{rnd}) and the approver screen
@@ -6974,6 +7025,7 @@ async function sibConflicts(conf){if(!conf||!conf.length)return;
 
 
 // ================= Duplicate check (never by name alone) =================
+function dpDone(u){const fm=famMap(),no=new Set();((S.meta.sib||{}).no||[]).forEach(k=>{const ids=String(k).split('+');if(ids.length>8)return;for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)no.add(smKey([ids[i],ids[j]]))});for(let i=0;i<u.length;i++)for(let j=i+1;j<u.length;j++){const a=u[i].id,b=u[j].id;if(!((fm[a]&&fm[a][b])||no.has(smKey([a,b]))))return false}return true}
 const DP={res:{red:[],yellow:[],sibs:[]},plan:{},sub:'',count:0,dirty:true};
 const nrm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9ऀ-ॿ]/g,'');
 function lev(a,b){if(a===b)return 0;const m=a.length,n=b.length;if(!m||!n)return Math.max(m,n);let p=Array.from({length:n+1},(_,i)=>i);for(let i=1;i<=m;i++){const c=[i];for(let j=1;j<=n;j++)c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));p=c}return p[n]}
@@ -6999,10 +7051,10 @@ DP.compute=function(){const all=allStudents(),dis=new Set((S.meta.dupok&&S.meta.
  const sd=S.meta.sib||{},decided=new Set([...(sd.yes||[]),...(sd.no||[]),...(sd.cous||[])]);const fam={};
  all.forEach(s=>{if(!nrm(s.father))return;[s.contact,s.contact2].forEach(c=>{const d=String(c||'').replace(/\D/g,'');if(d)(fam[nrm(s.father)+'|'+d]=fam[nrm(s.father)+'|'+d]||[]).push(s)})});
  const sibs=[],seenF=new Set();Object.entries(fam).forEach(([k,g])=>{const u=[];g.forEach(s=>{if(!u.some(x=>x.id===s.id||similar(x.name,s.name)))u.push(s)});
-  if(u.length>=2){const key=u.map(x=>x.id).sort().join('+');if(seenF.has(key)||decided.has(key))return;seenF.add(key);u.key=key;u.fname=u[0].father;u.mob=k.split('|')[1];sibs.push(u)}});
+  if(u.length>=2){const key=u.map(x=>x.id).sort().join('+');if(seenF.has(key)||decided.has(key)||dpDone(u))return;seenF.add(key);u.key=key;u.fname=u[0].father;u.mob=k.split('|')[1];sibs.push(u)}});
  const cm={};all.forEach(s=>[s.contact,s.contact2].forEach(c=>{const d=String(c||'').replace(/\D/g,'');if(d.length===10)(cm[d]=cm[d]||[]).push(s)}));
  const cous=[],seenC=new Set();Object.entries(cm).forEach(([mob,g])=>{const u=[];g.forEach(s=>{if(!u.some(x=>x.id===s.id))u.push(s)});if(u.length<2)return;const fams=[];u.forEach(s=>{const f=fams.find(F=>nrm(s.father)&&similar(F[0].father,s.father));if(f)f.push(s);else fams.push([s])});if(fams.length<2)return;
-  const key=u.map(x=>x.id).sort().join('+');if(seenC.has(key)||decided.has(key))return;seenC.add(key);u.key=key;u.mob=mob;cous.push(u)});
+  const key=u.map(x=>x.id).sort().join('+');if(seenC.has(key)||decided.has(key)||dpDone(u))return;seenC.add(key);u.key=key;u.mob=mob;cous.push(u)});
  DP.res={red,yellow,sibs,cous};DP.count=red.length+yellow.length};
 const byRef=r=>allStudents().find(s=>refOf(s)===r);
 // after add / edit / import: tell the admin if red duplicates appeared
@@ -7725,7 +7777,7 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
-const APP_BUILD='due-v228';
+const APP_BUILD='due-v230';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
