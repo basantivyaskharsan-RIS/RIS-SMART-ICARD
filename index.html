@@ -3870,18 +3870,21 @@ function gsDraw(){const R=$('#gs_r');if(!R)return;const q=GS.q,o=gsRun(q);const 
  R.querySelectorAll('[data-ge]').forEach(b=>b.onclick=()=>{const s=findStudent(b.dataset.ge);if(!s)return;if(adm&&can('edit'))editStudent(s,'admin');else editStudent(s,'sugg')});
  R.querySelectorAll('[data-gw]').forEach(b=>b.onclick=()=>{XW.kids=[b.dataset.gw];XW.title='';gsClose();go('xwk','acad');if(S.tab==='xwk')viewXwk()});
  R.querySelectorAll('[data-gs]').forEach(b=>b.onclick=()=>{XW.who=new Set([b.dataset.gs]);gsClose();go('xwk','acad');if(S.tab==='xwk')viewXwk()})}
-const FABM={moved:false};
+const FABM={moved:false,on:false};
 function fabDrag(b,key,fn){b.style.touchAction='none';let sx=0,sy=0,ox=0,oy=0,drag=false,tm=null,pid=null;
  const clamp=(x,y)=>[Math.max(4,Math.min(innerWidth-b.offsetWidth-4,x)),Math.max(4,Math.min(innerHeight-b.offsetHeight-4,y))];
  const put=(x,y)=>{const c=clamp(x,y);b.style.right='auto';b.style.bottom='auto';b.style.left=c[0]+'px';b.style.top=c[1]+'px'};
  const look=on=>{b.style.opacity=on?'.8':'';b.style.transform=on?'scale(1.12)':''};
  try{const p=JSON.parse(localStorage.getItem(key)||'null');if(p&&typeof p.x==='number'&&typeof p.y==='number')put(p.x,p.y)}catch(e){}
  b.onclick=()=>{if(FABM.moved){FABM.moved=false;return}fn()};
- b.addEventListener('pointerdown',e=>{pid=e.pointerId;sx=e.clientX;sy=e.clientY;const r=b.getBoundingClientRect();ox=r.left;oy=r.top;FABM.moved=false;drag=false;clearTimeout(tm);tm=setTimeout(()=>{drag=true;look(true);try{navigator.vibrate&&navigator.vibrate(15)}catch(_){}},300);try{b.setPointerCapture(pid)}catch(_){}});
- b.addEventListener('pointermove',e=>{if(pid!==e.pointerId)return;const dx=e.clientX-sx,dy=e.clientY-sy;if(!drag&&Math.hypot(dx,dy)>10){drag=true;clearTimeout(tm);look(true)}if(drag){if(Math.hypot(dx,dy)>3)FABM.moved=true;e.preventDefault();put(ox+dx,oy+dy)}});
- const end=e=>{if(pid!==e.pointerId)return;pid=null;clearTimeout(tm);look(false);if(drag&&FABM.moved){const r=b.getBoundingClientRect();try{localStorage.setItem(key,JSON.stringify({x:r.left,y:r.top}))}catch(_){}}drag=false};
+ b.addEventListener('pointerdown',e=>{pid=e.pointerId;sx=e.clientX;sy=e.clientY;const r=b.getBoundingClientRect();ox=r.left;oy=r.top;FABM.moved=false;drag=false;clearTimeout(tm);tm=setTimeout(()=>{drag=true;FABM.on=true;look(true);try{navigator.vibrate&&navigator.vibrate(15)}catch(_){}},300);try{b.setPointerCapture(pid)}catch(_){}});
+ b.addEventListener('pointermove',e=>{if(pid!==e.pointerId)return;const dx=e.clientX-sx,dy=e.clientY-sy;if(!drag&&Math.hypot(dx,dy)>10){drag=true;FABM.on=true;clearTimeout(tm);look(true)}if(drag){if(Math.hypot(dx,dy)>3)FABM.moved=true;e.preventDefault();put(ox+dx,oy+dy)}});
+ const end=e=>{if(pid!==e.pointerId)return;pid=null;clearTimeout(tm);look(false);if(drag&&FABM.moved){const r=b.getBoundingClientRect();try{localStorage.setItem(key,JSON.stringify({x:r.left,y:r.top}))}catch(_){}}drag=false;FABM.on=false;setTimeout(fabApart,50)};
  b.addEventListener('pointerup',end);b.addEventListener('pointercancel',end);
  addEventListener('resize',()=>{if(b.style.left){const r=b.getBoundingClientRect();put(r.left,r.top)}})}
+function fabApart(){try{const a=document.getElementById('gs_fab'),b=document.getElementById('gv_fab');if(!a||!b||b.hidden||FABM.on)return;const r=a.getBoundingClientRect(),q=b.getBoundingClientRect();if(!r.width||!q.width)return;const ox=Math.min(r.right,q.right)-Math.max(r.left,q.left),oy=Math.min(r.bottom,q.bottom)-Math.max(r.top,q.top);if(ox<12||oy<12)return;
+ let y=r.top-q.height-8;if(y<4)y=Math.min(innerHeight-q.height-4,r.bottom+8);b.style.right='auto';b.style.bottom='auto';b.style.left=Math.max(4,Math.min(innerWidth-q.width-4,r.left))+'px';b.style.top=y+'px'}catch(e){}}
+setInterval(fabApart,1500);
 function gsFab(){const need=!!(S.me&&S.ready!==false);let b=$('#gs_fab');if(!need){if(b)b.remove();return}if(b)return;b=document.createElement('button');b.id='gs_fab';b.textContent='🔍';b.setAttribute('aria-label','Search everything');b.style.cssText='position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;width:50px;height:50px;border-radius:25px;border:0;font-size:22px;background:var(--accent,#3c4a63);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3)';document.body.appendChild(b);fabDrag(b,'ris_fab_gs',()=>gsOpen(''))}
 setInterval(()=>{try{gsFab()}catch(e){}},700);
 // ---------- Extra work for teachers ----------
@@ -8098,7 +8101,7 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
-const APP_BUILD='due-v249';
+const APP_BUILD='due-v250';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
