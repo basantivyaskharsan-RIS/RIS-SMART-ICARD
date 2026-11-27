@@ -172,13 +172,34 @@ input[type=color]{width:46px;height:36px;padding:2px;border:1px solid var(--line
 nav .more{background:var(--surface2)}nav button .badge{margin-left:4px}.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mgrid button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:12px 8px;cursor:pointer;font-weight:600;font-size:14px}.mgrid button.on{background:var(--accent);color:var(--accent-ink)}
 .pill.dot{color:var(--bad);border-color:var(--bad)}.tiny{font-size:11.5px}.pg{background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.3);position:relative;overflow:hidden;flex:0 0 auto}.pgc{position:absolute;transform-origin:top left}.pgm{position:absolute;border:1px solid #bbb}
 input[type=date]{padding:8px;border:1px solid var(--line);border-radius:9px;background:var(--bg)}
+
+/* ===== v255: ERP wide-screen layout (only when body.erp; phones unchanged) ===== */
+#erpside,#erpbtn{display:none}
+body.erp{max-width:none;margin:0;padding-inline:0;padding-block:0 40px}
+body.erp .top{padding-inline:20px}body.erp.hdr2 .top .lg img{height:46px}
+body.erp #erpside{display:block;position:fixed;left:0;top:calc(env(safe-area-inset-top,0px) + 53px);bottom:0;width:252px;overflow-y:auto;background:var(--surface);border-right:1px solid var(--line);padding:10px 8px 20px;z-index:18}
+body.erp main#view,body.erp #bars{margin-left:252px;padding-inline:24px;max-width:1320px}
+body.erp #bnav,body.erp #subtabs,body.erp #navsw{display:none!important}
+body.erp.hasnav{padding-bottom:40px}
+body.erp #dlg>div{max-width:560px}body.erp #sheet>div{max-width:900px}
+#erpside button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:transparent;border-radius:9px;padding:8px 10px;cursor:pointer;font-size:14px;font-weight:600;color:var(--ink)}
+#erpside button:hover{background:var(--surface2)}
+#erpside button.gh{margin-top:4px}#erpside button.gh .ar{margin-left:auto;font-size:11px;color:var(--muted)}
+#erpside button.lf{padding:6px 10px 6px 34px;font-weight:500;font-size:13.5px}
+#erpside button.on{background:var(--accent);color:var(--accent-ink)}
+#erpside .bd{margin-left:auto;background:var(--bad);color:#fff;border-radius:99px;font-size:11px;padding:0 6px}
+#erpside .sp{height:1px;background:var(--line);margin:8px 4px}
+body:not(.erp)#x{}
+#erpbtn{position:fixed;right:14px;bottom:14px;z-index:40;border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:8px 14px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+body.erpwide:not(.erp) #erpbtn{display:block}
+@media print{#erpside,#erpbtn{display:none!important}body.erp main#view,body.erp #bars{margin-left:0}}
 </style>
 
 <div class="top"><button id="tbBack" class="backb" hidden aria-label="Back">←</button><div class="lg"><img id="topLogo" alt="RIS"></div><div class="ttl"><b id="appNm">Yours Radiant</b><small>Radiant International School, Kharsan</small></div><div class="tb" id="topBtns"></div></div>
 <div id="bars"></div>
 <nav id="tabs" hidden></nav><div id="subtabs" hidden></div>
 <main id="view"><p class="muted">Loading…</p></main>
-<nav id="bnav" hidden></nav><input type="file" id="fvcf" hidden><div id="sheet" hidden></div><div id="dlg" hidden></div><div id="toast"></div>
+<aside id="erpside"></aside><button id="erpbtn" hidden>🖥 ERP view</button><nav id="bnav" hidden></nav><input type="file" id="fvcf" hidden><div id="sheet" hidden></div><div id="dlg" hidden></div><div id="toast"></div>
 <div id="stage" style="position:fixed;left:-9999px;top:0;width:400px"></div>
 <input type="file" id="fgal" accept="image/*" hidden><input type="file" id="fcamf" accept="image/*" capture="user" hidden><input type="file" id="fmulti" accept="image/*" multiple hidden><input type="file" id="fzip" accept=".zip,application/zip" hidden><input type="file" id="fjson" accept=".json,application/json" hidden><input type="file" id="fstf" accept=".xlsx,.xls,.csv" hidden><input type="file" id="fcam" accept="image/*" capture="environment" hidden><input type="file" id="fxls" accept=".xlsx,.xls,.csv" hidden>
 
@@ -5675,7 +5696,7 @@ function showTabs(){const n=$('#bnav'),sb=$('#subtabs');$('#tabs').hidden=true;n
  if(g.leaves.length<2){sb.hidden=true}else{sb.hidden=false;sb.innerHTML=g.leaves.map(l=>`<button data-l="${l.id}" class="${S.tab===l.id?'on':''}">${l.nm}${bd(l.n)}</button>`).join('');
   sb.querySelectorAll('button[data-l]').forEach(b=>b.onclick=()=>go(b.dataset.l,g.k))}
  updBack()}
-function updBack(){const b=$('#tbBack');if(!b)return;const show=!!(S.me&&S.ready&&!S.hold&&((S.stack&&S.stack.length)||!$('#sheet').hidden||!$('#dlg').hidden));b.hidden=!show}
+function updBack(){erpApply();const b=$('#tbBack');if(!b)return;const show=!!(S.me&&S.ready&&!S.hold&&((S.stack&&S.stack.length)||!$('#sheet').hidden||!$('#dlg').hidden));b.hidden=!show}
 let rt=null;function refresh(){clearTimeout(rt);rt=setTimeout(()=>{try{xqEnsure();trEnsure();bkEnsure();ntEnsure();rgEnsure();wgEnsure()}catch(e){}DP.dirty=true;renderAll(false)},80)}
 const typing=()=>/INPUT|SELECT|TEXTAREA/.test((document.activeElement||{}).tagName||'')&&$('#view').contains(document.activeElement);
 function renderAll(force){renderTop();
@@ -8171,9 +8192,34 @@ ${R.only.length?`<div class="box"><h3>Only in the Fee System (${R.only.length})<
  h.querySelectorAll('[data-fa]').forEach(b=>b.onclick=async()=>{b.disabled=true;const x=fill.find(z=>z.s.id===b.dataset.fa);if(await apply(x)){x.ch={};toast('Applied ✔',2000);fsPaint()}else b.disabled=false});
  if($('#fs_all'))$('#fs_all').onclick=()=>ask('Fill the blank boxes of '+fill.length+' children from the Fee System? Nothing already filled is changed.',async()=>{busy('Saving…');let ok=0,bad=0;try{for(let i=0;i<fill.length;i++){busyP(`${i+1} / ${fill.length}`,i/fill.length);if(await apply(fill[i])){fill[i].ch={};ok++}else bad++}}finally{unbusy()}toast(`Filled ${ok} ✔`+(bad?` · ${bad} not saved`:''),5000);fsPaint()},'Yes, fill')}
 // ================= App check: is the newest file running, do the Firebase rules allow every part, are features present =================
+
+// ===== v255: ERP wide-screen layer (left menu on big screens; phone view unchanged) =====
+const ERP={open:{},sig:''};
+const erpPref=()=>{try{return localStorage.getItem('ris_erp')}catch(e){return null}};
+const erpSetPref=v=>{try{localStorage.setItem('ris_erp',v)}catch(e){}};
+const erpWide=()=>window.innerWidth>=1000;
+function erpApply(){try{const b=document.body,ok=!!(S.me&&S.ready&&!S.hold),wide=erpWide(),on=ok&&wide&&erpPref()!=='off';
+ b.classList.toggle('erpwide',ok&&wide);b.classList.toggle('erp',on);const bt=$('#erpbtn'),sd=$('#erpside');if(!sd)return;
+ if(bt){bt.hidden=!(ok&&wide&&!on);bt.onclick=()=>{erpSetPref('on');erpApply()}}
+ if(!on){sd.innerHTML='';ERP.sig='';return}
+ const tp=document.querySelector('.top');if(tp)sd.style.top=Math.round(tp.getBoundingClientRect().bottom)+'px';
+ const G=navGroups(),R=reqGroup(),all=R?[...G,R]:G;
+ const sig=[S.tab,S.grp,S.me&&S.me.id,all.map(g=>g.k+g.leaves.length+(g.n||0)).join(','),Object.keys(ERP.open).filter(k=>ERP.open[k]).join(',')].join('|');if(sig===ERP.sig)return;ERP.sig=sig;
+ const bd=c=>c?`<span class="bd">${c}</span>`:'';
+ const cur=all.find(g=>g.k===S.grp&&g.leaves.some(l=>l.id===S.tab))||all.find(g=>g.leaves.some(l=>l.id===S.tab));
+ let h=`<button data-e="home" class="${S.tab==='home'?'on':''}">🏠 Home</button><button data-e="fav" class="${S.tab==='fav'?'on':''}">⭐ Favourites</button><button data-e="menu" class="${S.tab==='menu'?'on':''}">☰ All menu</button><div class="sp"></div>`;
+ all.forEach(g=>{const op=ERP.open[g.k]!==undefined?ERP.open[g.k]:(cur&&cur.k===g.k);
+  h+=`<button class="gh" data-eg="${esc(g.k)}"><span>${g.ic||''}</span><span>${esc(g.nm)}</span>${bd(g.n)}<span class="ar">${op?'▾':'▸'}</span></button>`;
+  if(op)h+=g.leaves.map(l=>`<button class="lf ${S.tab===l.id&&(!cur||cur.k===g.k)?'on':''}" data-el="${esc(l.id)}" data-eg2="${esc(g.k)}">${esc(l.nm)}${bd(l.n)}</button>`).join('')});
+ h+=`<div class="sp"></div><button data-e="phone">📱 Phone view</button>`;
+ sd.innerHTML=h;
+ sd.querySelectorAll('[data-e]').forEach(x=>x.onclick=()=>{const k=x.dataset.e;if(k==='phone'){erpSetPref('off');erpApply();return}go(k)});
+ sd.querySelectorAll('[data-eg]').forEach(x=>x.onclick=()=>{const k=x.dataset.eg,g=all.find(y=>y.k===k),was=ERP.open[k]!==undefined?ERP.open[k]:(cur&&cur.k===k);ERP.open[k]=!was;ERP.sig='';erpApply()});
+ sd.querySelectorAll('[data-el]').forEach(x=>x.onclick=()=>go(x.dataset.el,x.dataset.eg2))}catch(e){}}
+window.addEventListener('resize',()=>{clearTimeout(ERP.rt);ERP.rt=setTimeout(()=>{ERP.sig='';erpApply()},150)});
 const APP_NAME='Yours Radiant';
 try{document.title=APP_NAME;const _n=document.getElementById('appNm');if(_n)_n.textContent=APP_NAME}catch(e){}
-const APP_BUILD='due-v254';
+const APP_BUILD='due-v255';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
