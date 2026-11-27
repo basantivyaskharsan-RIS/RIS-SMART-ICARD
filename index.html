@@ -5131,9 +5131,9 @@ const PSPK='ris_pspd',PC={psp:'#dbe8ff',rte:'#d9f2e0',nw:'#ffe9c7',rm:'#fbd5d5',
 function pspSave(){try{localStorage.setItem(PSPK,JSON.stringify({rows:PSX.rows,link:PSX.link,rm:[...PSX.rm],add:[...PSX.add]}))}catch(e){}}
 function pspLoad(){try{const o=JSON.parse(localStorage.getItem(PSPK)||'null');if(o&&o.rows&&o.rows.length){PSX.rows=o.rows;PSX.link=o.link||{};PSX.rm=new Set(o.rm||[]);PSX.add=new Set(o.add||[]);return true}}catch(e){}return false}
 function pspIdx(){const A=allStudents();PSX.idx=A.map(s=>({s,n:pspNm(s.name),f:pspNm(s.father)}));PSX.map={};A.forEach(s=>{PSX.map[s.id]=s})}
-function pspCand(r,lim){const rn=pspNm(r.name),rf=pspNm(r.father),out=[];PSX.idx.forEach(x=>{const n=pspSim(rn,x.n);if(n<0.5)return;const f=(!rf||!x.f)?0.5:pspSim(rf,x.f);if(n<0.67&&rn.split(' ')[0]!==x.n.split(' ')[0])return;out.push({s:x.s,n,f,v:n*2+f})});out.sort((a,b)=>b.v-a.v);return out.slice(0,lim||5)}
+function pspCand(r,lim){const rn=pspNm(r.name),rf=pspNm(r.father),rs=pspSrN(r.sr),out=[];PSX.idx.forEach(x=>{const n=pspSim(rn,x.n);const f=(!rf||!x.f)?0.5:pspSim(rf,x.f);const sm=!!(rs&&rs===pspSrN(x.s.sr));if(!(sm&&(n>=0.34||f>=0.5))){if(n<0.5)return;if(n<0.67&&rn.split(' ')[0]!==x.n.split(' ')[0])return}out.push({s:x.s,n,f,sm,v:n*2+f+(sm?1.5:0)+(x.s.rte?0.3:0)})});out.sort((a,b)=>b.v-a.v);return out.slice(0,lim||5)}
 function pspAuto(){const taken={};Object.keys(PSX.link).forEach(k=>{const v=PSX.link[k];if(v&&v!=='-')taken[v]=1});const pick={};
- PSX.rows.forEach(r=>{if(PSX.link[r.no])return;const c=pspCand(r,3),b=c[0];if(!b)return;const strong=(b.n===1&&b.f>=0.5)||(b.n>=0.67&&b.f===1);if(!strong)return;if(c[1]&&c[1].v>=b.v-0.01)return;(pick[b.s.id]=pick[b.s.id]||[]).push(r.no)});
+ PSX.rows.forEach(r=>{if(PSX.link[r.no])return;const c=pspCand(r,3),b=c[0];if(!b)return;const strong=(b.n===1&&b.f>=0.5)||(b.n>=0.67&&b.f===1)||(b.sm&&b.n>=0.5&&b.f>=0.5);if(!strong)return;if(c[1]&&c[1].v>=b.v-0.01)return;(pick[b.s.id]=pick[b.s.id]||[]).push(r.no)});
  Object.keys(pick).forEach(id=>{if(pick[id].length===1&&!taken[id])PSX.link[pick[id][0]]=id})}
 function pspNotes(r,s){const N=[],ac=cmClsNo(s.cls);if(ac!==r.cls)N.push('Class: PSP '+r.pcls+' ('+r.cls+') · App '+s.cls);
  const as=pspSrN(s.sr);if(!as)N.push('SR missing in app (PSP '+r.sr+')');else if(as!==pspSrN(r.sr))N.push('SR: PSP '+r.sr+' · App '+s.sr);
@@ -8391,7 +8391,7 @@ function erpApply(){try{const b=document.body,ok=!!(S.me&&S.ready&&!S.hold),wide
 window.addEventListener('resize',()=>{clearTimeout(ERP.rt);ERP.rt=setTimeout(()=>{ERP.sig='';erpApply()},150)});
 const APP_NAME='Yours Radiant';
 try{document.title=APP_NAME;const _n=document.getElementById('appNm');if(_n)_n.textContent=APP_NAME}catch(e){}
-const APP_BUILD='due-v266';
+const APP_BUILD='due-v267';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
