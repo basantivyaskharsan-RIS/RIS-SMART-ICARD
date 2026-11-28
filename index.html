@@ -3928,6 +3928,23 @@ function gsRoman(s){s=String(s||'');s=s.replace(/[०-९]/g,c=>String('०१�
 function gsSk(s){return gsRoman(s).replace(/[^a-z0-9]/g,'').replace(/ph/g,'f').replace(/w/g,'v').replace(/z/g,'j').replace(/q|c(?!h)/g,'k').replace(/ksh|x/g,'ks').replace(/sh|ch|kh|gh|th|dh|bh|jh/g,m=>m[0]).replace(/[aeiouyh]/g,'').replace(/(.)\1+/g,'$1')}
 const gsWs=s=>gsT(s).split(' ').map(gsSk).join(' ');
 const gsT=s=>gsRoman(s).replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+const GSSUB=[
+ {nm:'Ledger entry (Special ID 1,2,3 order)',in:'Fee update',al:'ledger लेजर एंट्री special id fee भरना fee entry paper ledger',tab:'fup',act:()=>{FUP.f='led';FUP.ls='due'}},
+ {nm:'Ledger — Due, to fill',in:'Fee update › Ledger',al:'ledger due to fill बाकी फीस भरनी बाकी',tab:'fup',act:()=>{FUP.f='led';FUP.ls='due'}},
+ {nm:'Ledger — Filled, still owes',in:'Fee update › Ledger',al:'ledger filled भरी हुई बकाया',tab:'fup',act:()=>{FUP.f='led';FUP.ls='fill'}},
+ {nm:'Ledger — Zero due',in:'Fee update › Ledger',al:'zero due ledger जीरो ड्यू बकाया शून्य paid पूरी भरी',tab:'fup',act:()=>{FUP.f='led';FUP.ls='zero'}},
+ {nm:'Fee update — To update list',in:'Fee update',al:'to update pending फीस अपडेट बाकी',tab:'fup',act:()=>{FUP.f='pend'}},
+ {nm:'Fee update — Updated in this phase',in:'Fee update',al:'updated done phase फेज़ अपडेट हो गई',tab:'fup',act:()=>{FUP.f='done'}},
+ {nm:'Fee update — Paid / no due',in:'Fee update',al:'paid no due zero due पूरी फीस भरी',tab:'fup',act:()=>{FUP.f='clr'}},
+ {nm:'Special cash / Exempted / Staff child list',in:'Fee update',al:'special cash exempted staff child स्टाफ चाइल्ड माफ़ी dispute',tab:'fup',act:()=>{FUP.f='sp'}},
+ {nm:'Start next fee phase (Fee update 2)',in:'Fee update',al:'phase फेज़ next start fee update 2 नया फेज़',tab:'fup',act:()=>{FUP.f='pend'}},
+ {nm:"Count a day's updates as this phase",in:'Fee update',al:'phase today आज की अपडेट फेज़ 1',tab:'fup',act:()=>{FUP.f='pend'}},
+ {nm:'Fee payments Excel (cash / SBI / ICICI)',in:'Fee update',al:'payments excel cash online sbi icici staff received',tab:'fup',act:()=>{FUP.f='pend'}},
+ {nm:'Mark admit card as Printed',in:'Admit card',al:'mark printed admit card प्रिंट हो गया',tab:'admit',act:()=>{}},
+ {nm:'Match Special ID from Excel',in:'Special ID numbers',al:'special id excel match मैच',tab:'spid',act:()=>{}},
+ {nm:'Merge sections of a class (e.g. class 8)',in:'Class & section',al:'merge section क्लास 8 सेक्शन मर्ज',tab:'clsec',act:()=>{}}
+];
+function gsGrpOf(id){try{const g=navGroups().find(g=>g.leaves.some(l=>l.id===id));return g?g.k:''}catch(e){return''}}
 const GSALIAS={dacc:'data access एक्सेस अधिकार टीचर को डेटा भरने का अधिकार',resp:'responsibility ज़िम्मेदारी जिम्मेदारी क्लास टीचर बनाओ floor incharge',tsk:'task tasks काम टास्क',brs:'bulk route stop गाँव रूट स्टॉप एक साथ बदलो ट्रांसपोर्ट',gwk:'give work access काम अधिकार दो टीचर को ट्रांसपोर्ट परीक्षा फीस अकाउंट',vcl:'contact list village stop route गाँव स्टॉप रूट संपर्क सूची',rsl:'responsibility list ज़िम्मेदारी सूची किसके पास क्या चार्ज',xreg:'exam register परीक्षा रजिस्टर अंक',xwk:'extra work अतिरिक्त काम टीचर को काम दो पेंडिंग',crt:'child routes रूट बस route bus',prof:'my profile परिचय डायरी diary',natd:'native district नेटिव जिला',ldiag:'login diagnostic लॉगिन टीचर लॉगिन नहीं हो रहा',dent:'my data entry डेटा भरना',inbox:'requests अनुरोध मंज़ूरी approve',students:'students बच्चे विद्यार्थी',staff:'staff स्टाफ़ टीचर शिक्षक'};
 const GS={q:'',rec:null};
 function gsAllowed(s){if(isAdmin())return true;const m=myCls();return m.includes(s.cls)||m.includes(baseOf(s.cls))}
@@ -3936,6 +3953,7 @@ function gsRun(q){q=String(q||'').trim();const out={tabs:[],kids:[],vill:[],rout
  const hit=(hay,hsk)=>ws.every(w=>hay.includes(w)||(gsSk(w).length>=2&&String(hsk).split(' ').some(h=>h.startsWith(gsSk(w)))));
  // tabs
  try{navGroups().forEach(g=>g.leaves.forEach(l=>{if(out.tabs.some(x=>x.id===l.id))return;const h=gsT(l.nm+' '+g.nm+' '+(GSALIAS[l.id]||'')),hk=/[ऀ-ॿ]/.test(q)?gsWs(l.nm+' '+(GSALIAS[l.id]||'')):'';if(hit(h,hk))out.tabs.push({id:l.id,g:g.k,nm:l.nm,gn:g.nm})}))}catch(e){}
+ out.subs=[];try{if(isAdmin()){const lv=new Set();navGroups().forEach(g=>g.leaves.forEach(l=>lv.add(l.id)));GSSUB.forEach((x,i)=>{if(!lv.has(x.tab))return;const h=gsT(x.nm+' '+x.in+' '+x.al),hk=/[ऀ-ॿ]/.test(q)?gsWs(x.nm+' '+x.al):'';if(hit(h,hk))out.subs.push(i)})}}catch(e){}
  // routes: "route 3" / "रूट 3"
  const rm=qt.match(/^(?:route|rut|root)\s*([a-z0-9]+)$/);
  const all=allStudents().filter(gsAllowed);
@@ -3966,7 +3984,9 @@ function gsDraw(){const R=$('#gs_r');if(!R)return;const q=GS.q,o=gsRun(q);const 
  const rt=o.routes.map(x=>`<div class="box" style="margin:4px 0"><b>Route ${esc(x.rn)}</b> ${x.st?'<span class="muted small">('+esc(x.st)+')</span>':''} · ${x.n} children</div>`).join('');
  const kids=o.kids.map(s=>`<div class="box" style="margin:4px 0"><div class="row" style="gap:6px"><div class="grow"><b>${esc(tc(s.name))}</b> <span class="small muted">${esc(s.cls)}${s.roll?' · Roll '+esc(s.roll):''}</span><div class="small muted">F: ${esc(tc(s.father)||'—')} · ${esc(s.contact||'—')}</div><div class="small muted">${esc(vu(s.village)||'no village')}${s.route1?' · Route '+esc(routeNum(s.route1)):''}</div></div></div><div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn sm sec" data-go="${esc(s.id)}">Open</button><button class="btn sm" data-ge="${esc(s.id)}">✏ Change</button>${adm?`<button class="btn sm sec" data-gw="${esc(s.id)}">Give work</button>`:''}</div></div>`).join('')+(o.more?`<p class="small muted">${o.more} more — type more letters to narrow down.</p>`:'');
  const stf=o.staff.map(p=>`<div class="box row" style="margin:4px 0;gap:6px;flex-wrap:wrap"><div class="grow"><b>${esc(p.name)}</b><div class="small muted">${esc(catLabel(p.cat)||'')} ${esc(p.mobile)}</div></div><button class="btn sm sec" data-gs="${esc(p.id)}">Give work</button></div>`).join('');
- R.innerHTML=(sec('Screens',tabs)+sec('Routes',rt)+sec('Villages',vil)+sec('Children ('+(o.kids.length+(o.more||0))+')',kids)+sec('Staff',stf))||'<p class="muted small">Nothing found. Try fewer letters, or another spelling.</p>';
+ const sbs=(o.subs||[]).slice(0,8).map(i=>`<div class="box row" style="margin:4px 0;gap:8px"><div class="grow"><b>${esc(GSSUB[i].nm)}</b><div class="small muted">${esc(GSSUB[i].in)}</div></div><button class="btn sm" data-gsub="${i}">Open</button></div>`).join('');
+ R.innerHTML=(sec('Options inside screens',sbs)+sec('Screens',tabs)+sec('Routes',rt)+sec('Villages',vil)+sec('Children ('+(o.kids.length+(o.more||0))+')',kids)+sec('Staff',stf))||'<p class="muted small">Nothing found. Try fewer letters, or another spelling.</p>';
+ R.querySelectorAll('[data-gsub]').forEach(b=>b.onclick=()=>{const x=GSSUB[+b.dataset.gsub];gsClose();try{x.act()}catch(e){}if(S.tab===x.tab){renderAll(true)}else go(x.tab,gsGrpOf(x.tab))});
  R.querySelectorAll('[data-gt]').forEach(b=>b.onclick=()=>{const[i,g]=b.dataset.gt.split('|');gsClose();go(i,g)});
  R.querySelectorAll('[data-gv]').forEach(b=>b.onclick=()=>{$('#gs_q').value=b.dataset.gv;GS.q=b.dataset.gv;gsDraw()});
  R.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>openStudent(b.dataset.go));
@@ -8619,7 +8639,7 @@ ${FUP.f==='led'?`<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px;a
  $('#fu_x2').onclick=()=>{const R=fupEntries().sort((a,b)=>a.e.t-b.e.t).map(x=>[fupName(x.e.p),new Date(x.e.t).toLocaleDateString('en-GB'),x.s.name,x.s.cls,x.e.o,x.e.a,x.e.n,FUP_M[x.e.m]||x.e.m,x.e.w||'',x.e.r||'',x.e.b||'']);if(!R.length)return toast('No payment saved yet.',3000);exportTableDialog('Fee_payments',[['All fee updates',['Phase','Date','Child','Class','Old due','Paid','New due','Mode','Received by','Ref','Entered by'],R]])};
 }
 
-const APP_BUILD='due-v293';
+const APP_BUILD='due-v294';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
