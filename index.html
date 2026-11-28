@@ -7889,6 +7889,17 @@ async function applyImport(){const p=S.imp;if(!p)return;busy('Saving…');try{co
 
 // ================= Divide sections (admin) =================
 const DSP={base:'',plan:{}};
+// ---- v284: merge all sections of a class into one, new roll numbers (preview first)
+const DMG={sec:'A',start:'',ord:'name'};
+function dvMerge(base){const kids=allStudents().filter(s=>!s.left&&splitClass(s.cls)[0]===base);if(!kids.length)return toast('No children in this class.',4000);
+ const n=parseInt(base,10),def=isNaN(n)?'':String(n*100+1);if(!DMG.start)DMG.start=def;
+ const d=$('#dlg');d.hidden=false;const draw=()=>{const st=parseInt(DMG.start,10)||0;const L=kids.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'en',{sensitivity:'base'}));const target=base+' - '+DMG.sec;
+  d.innerHTML=`<div><b>Merge Class ${esc(base)} into one section</b><p class="small muted" style="margin:6px 0">All ${L.length} children go to <b>${esc(target)}</b>. Roll number and attendance number are given in name order (A→Z), starting from the number below. A backup is taken first.</p>
+  <div class="row" style="gap:6px"><div class="grow"><label class="f" style="margin-top:0">Section name</label><select id="mg_s">${['A','B','C','D'].map(x=>`<option ${x===DMG.sec?'selected':''}>${x}</option>`).join('')}</select></div><div class="grow"><label class="f" style="margin-top:0">First roll number</label><input type="number" id="mg_n" value="${esc(DMG.start)}"></div></div>
+  <div style="max-height:46vh;overflow:auto;margin-top:6px">${L.map((s,i)=>`<div class="small" style="padding:3px 0;border-bottom:1px solid var(--line)"><b>${st+i}</b> · ${esc(s.name)} <span class="muted">· was ${esc(s.cls)}${s.roll?' / roll '+esc(s.roll):''}</span></div>`).join('')}</div>
+  <div class="row" style="margin-top:8px;gap:6px"><button class="btn sec grow" id="mg_x">Cancel</button><button class="btn grow" id="mg_ok" ${st>0?'':'disabled'}>Apply — merge ${L.length} children</button></div></div>`;
+  $('#mg_s').onchange=e=>{DMG.sec=e.target.value;draw()};$('#mg_n').onchange=e=>{DMG.start=e.target.value;draw()};$('#mg_x').onclick=()=>{d.hidden=true};
+  $('#mg_ok').onclick=async()=>{const moves=L.map((s,i)=>({st:Object.assign({},s,{roll:String(st+i),att:String(i+1)}),cls:target}));d.hidden=true;try{await moveMany(moves);toast('Merged ✔ '+moves.length+' children in '+target,5000);if(S.tab==='divide')viewDivide()}catch(e){toast('Not saved: '+errMsg(e),8000)}}};draw()}
 function viewDivide(){const v=$('#view');const all=allStudents();const bases=[...new Set(all.map(s=>splitClass(s.cls)[0]))].sort(cmpClass);
  if(!bases.includes(DSP.base))DSP.base=bases[0]||'';
  const list=sortStudents(all.filter(s=>splitClass(s.cls)[0]===DSP.base));const secs=secsFor(DSP.base);
@@ -7898,12 +7909,13 @@ function viewDivide(){const v=$('#view');const all=allStudents();const bases=[..
  v.innerHTML=`<h2>Divide sections</h2><p class="muted small">Choose a class, then tap A / B / C / D next to each child. Nothing is saved until you tap "Save changes".</p>
 <div class="box"><label class="f" style="margin-top:0">Class</label><select id="dv_b">${bases.map(b=>`<option ${b===DSP.base?'selected':''}>${esc(b)}</option>`).join('')}</select>
 <div class="row small" style="margin-top:8px">${secs.map(x=>`<span class="pill b">${x}: ${cnt[x]||0}</span>`).join('')}${cnt['']?`<span class="pill r">No section: ${cnt['']}</span>`:''}<span class="pill">Total: ${list.length}</span></div>
-${n?`<div class="row" style="margin-top:8px"><button class="btn grow" id="dv_save">Save changes (${n})</button><button class="btn sec grow" id="dv_clr">Cancel changes</button></div>`:''}</div>
+<div class="row" style="margin-top:8px"><button class="btn sec grow" id="dv_mg">🔗 Merge all sections of this class into one</button></div>${n?`<div class="row" style="margin-top:8px"><button class="btn grow" id="dv_save">Save changes (${n})</button><button class="btn sec grow" id="dv_clr">Cancel changes</button></div>`:''}</div>
 <div class="box">${list.map((s,i)=>{const cur=secOf(s),ch=DSP.plan[s.id]!==undefined;return `<div class="item" style="cursor:default"><span class="sn">${i+1}.</span><div class="grow"><div class="nm">${esc(s.name)}${s.village?' <span class="muted small">· '+esc(vu(s.village))+'</span>':''}${ch?' <span class="pill y">changed</span>':''}</div><div class="mt">Roll ${esc(s.roll||'-')}${s.father?' · '+esc(s.father):''}${s.village?' · 📍 '+esc(vu(s.village)):''}</div></div><div class="row" style="gap:4px;flex:0 0 auto">${secs.map(x=>`<button class="btn sm ${cur===x?'':'sec'}" data-d="${esc(s.id)}" data-x="${x}">${x}</button>`).join('')}</div></div>`}).join('')||'<p class="muted">No students in this class.</p>'}</div>`;
  window.scrollTo(0,y0);
  $('#dv_b').onchange=e=>{if(Object.keys(DSP.plan).length&&!confirm('Unsaved changes will be lost. Continue?')){e.target.value=DSP.base;return}DSP.base=e.target.value;DSP.plan={};viewDivide()};
  v.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const s=list.find(x=>x.id===b.dataset.d);if(!s)return;const orig=splitClass(s.cls)[1];if(b.dataset.x===orig)delete DSP.plan[s.id];else DSP.plan[s.id]=b.dataset.x;viewDivide()});
  if($('#dv_clr'))$('#dv_clr').onclick=()=>{DSP.plan={};viewDivide()};
+ $('#dv_mg').onclick=()=>{if(Object.keys(DSP.plan).length)return toast('Save or cancel your changes first.',4000);dvMerge(DSP.base)};
  if($('#dv_save'))$('#dv_save').onclick=async()=>{const moves=[];list.forEach(s=>{const x=DSP.plan[s.id];if(x!==undefined)moves.push({st:s,cls:DSP.base+' - '+x})});
   try{await moveMany(moves);DSP.plan={};toast(moves.length+' students moved ✔');viewDivide()}catch(e){toast(errMsg(e),6000)}}}
 
@@ -8521,7 +8533,7 @@ function erpApply(){try{const b=document.body,ok=!!(S.me&&S.ready&&!S.hold),wide
 window.addEventListener('resize',()=>{clearTimeout(ERP.rt);ERP.rt=setTimeout(()=>{ERP.sig='';erpApply()},150)});
 const APP_NAME='Yours Radiant';
 try{document.title=APP_NAME;const _n=document.getElementById('appNm');if(_n)_n.textContent=APP_NAME}catch(e){}
-const APP_BUILD='due-v283';
+const APP_BUILD='due-v284';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
