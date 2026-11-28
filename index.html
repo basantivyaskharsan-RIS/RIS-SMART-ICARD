@@ -965,10 +965,11 @@ const LEAFKW={lvapp:'leave approvals staff leave permission approve reject early
 function hmSearch(v,all,grpOf){const q=$('#hm_q'),out=$('#hm_r2'),bod=$('#hm_b');
  const norm=s=>String(s||'').toLowerCase();
  const run=()=>{MN.hq=q.value;const k=norm(q.value).trim();if(!k){out.innerHTML='';bod.hidden=false;return}bod.hidden=true;
-  const seen=new Set(),hit=[];all.forEach(g=>g.leaves.forEach(l=>{if(seen.has(l.id))return;const gs=all.filter(x=>x.leaves.some(y=>y.id===l.id));const hay=norm(l.nm+' '+gs.map(x=>x.nm+' '+(x.hint||'')).join(' ')+' '+(LEAFKW[l.id]||''));if(k.split(/\s+/).every(w=>hay.includes(w))){seen.add(l.id);hit.push([l,gs])}}));
+  const seen=new Set(),hit=[];all.forEach(g=>g.leaves.forEach(l=>{if(seen.has(l.id))return;const gs=all.filter(x=>x.leaves.some(y=>y.id===l.id));const hay=norm(l.nm+' '+gs.map(x=>x.nm+' '+(x.hint||'')).join(' ')+' '+(LEAFKW[l.id]||''));if(k.split(/\s+/).every(w=>hay.includes(w))||gsMatch(l.nm+' '+(GSALIAS[l.id]||'')+' '+(LEAFKW[l.id]||''),q.value)){seen.add(l.id);hit.push([l,gs])}}));
+  const lvs=new Set();all.forEach(g=>g.leaves.forEach(l=>lvs.add(l.id)));const subs=isAdmin()?GSSUB.map((x,i)=>i).filter(i=>lvs.has(GSSUB[i].tab)&&gsMatch(GSSUB[i].nm+' '+GSSUB[i].in+' '+GSSUB[i].al,q.value)).slice(0,8):[];
   const gh=all.filter(g=>norm(g.nm+' '+(g.hint||'')).includes(k)&&g.k!=='req');
-  out.innerHTML=(gh.length?gh.map(g=>`<div class="hmr"><button class="hmb" data-gg="${g.k}">${g.ic} ${esc(g.nm)}<em>›</em><small>Open the whole group</small></button></div>`).join(''):'')+hit.map(([l,gs])=>`<div class="hmr"><button class="hmb" data-go="${esc(l.id)}" data-k="${esc(gs[0].k)}">${esc(l.nm)}<em>›</em><small>${esc(gs.map(x=>x.nm).join(' · '))}</small></button></div>`).join('')+`<div class="hmr"><button class="hmb" id="hm_st">🔍 “${esc(q.value)}” — search in students / staff<em>›</em></button></div>`;
-  out.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go,b.dataset.k));
+  out.innerHTML=subs.map(i=>`<div class="hmr"><button class="hmb" data-gsub="${i}">${esc(GSSUB[i].nm)}<em>›</em><small>${esc(GSSUB[i].in)}</small></button></div>`).join('')+(gh.length?gh.map(g=>`<div class="hmr"><button class="hmb" data-gg="${g.k}">${g.ic} ${esc(g.nm)}<em>›</em><small>Open the whole group</small></button></div>`).join(''):'')+hit.map(([l,gs])=>`<div class="hmr"><button class="hmb" data-go="${esc(l.id)}" data-k="${esc(gs[0].k)}">${esc(l.nm)}<em>›</em><small>${esc(gs.map(x=>x.nm).join(' · '))}</small></button></div>`).join('')+`<div class="hmr"><button class="hmb" id="hm_st">🔍 “${esc(q.value)}” — search in students / staff<em>›</em></button></div>`;
+  out.querySelectorAll('[data-gsub]').forEach(b=>b.onclick=()=>gsSubGo(b.dataset.gsub));out.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go,b.dataset.k));
   out.querySelectorAll('[data-gg]').forEach(b=>b.onclick=()=>go('grp',b.dataset.gg));
   $('#hm_st').onclick=()=>{const val=q.value;globalSearch();setTimeout(()=>{const i=$('#gs_q');if(i){i.value=val;i.dispatchEvent(new Event('input',{bubbles:true}))}},60)}};
  q.oninput=run;run()}
@@ -3924,7 +3925,7 @@ ${L.map(r=>`<div class="box" style="margin:6px 0"><div class="row"><b class="gro
 
 // ================= v109: Search everything (voice) + Extra work for teachers =================
 const GSD={'ऀ':'','ँ':'n','ं':'n','ः':'h','अ':'a','आ':'aa','इ':'i','ई':'i','उ':'u','ऊ':'u','ए':'e','ऐ':'ai','ओ':'o','औ':'au','ऋ':'ri','ा':'a','ि':'i','ी':'i','ु':'u','ू':'u','े':'e','ै':'ai','ो':'o','ौ':'au','ृ':'ri','्':'','़':'','क':'k','ख':'kh','ग':'g','घ':'gh','ङ':'n','च':'ch','छ':'chh','ज':'j','झ':'jh','ञ':'n','ट':'t','ठ':'th','ड':'d','ढ':'dh','ण':'n','त':'t','थ':'th','द':'d','ध':'dh','न':'n','प':'p','फ':'f','ब':'b','भ':'bh','म':'m','य':'y','र':'r','ल':'l','व':'v','श':'sh','ष':'sh','स':'s','ह':'h','ळ':'l','क्ष':'ksh','ज्ञ':'gy'};
-function gsRoman(s){s=String(s||'');s=s.replace(/[०-९]/g,c=>String('०१२३४५६७८९'.indexOf(c)));let o='';for(let i=0;i<s.length;i++){const c=s[i];if(GSD[c]!==undefined){o+=GSD[c];const n=s[i+1];if(/[क-ह]/.test(c)&&(!n||!/[ािीुूेैोौृ्]/.test(n)))o+='a'}else o+=c}return o.toLowerCase()}
+function gsRoman(s){s=String(s||'').normalize('NFD').replace(/\u093c/g,'');s=s.replace(/[०-९]/g,c=>String('०१२३४५६७८९'.indexOf(c)));let o='';for(let i=0;i<s.length;i++){const c=s[i];if(GSD[c]!==undefined){o+=GSD[c];const n=s[i+1];if(/[क-ह]/.test(c)&&(!n||!/[ािीुूेैोौृ्]/.test(n)))o+='a'}else o+=c}return o.toLowerCase()}
 // phonetic skeleton: consonants only, similar sounds merged
 function gsSk(s){return gsRoman(s).replace(/[^a-z0-9]/g,'').replace(/ph/g,'f').replace(/w/g,'v').replace(/z/g,'j').replace(/q|c(?!h)/g,'k').replace(/ksh|x/g,'ks').replace(/sh|ch|kh|gh|th|dh|bh|jh/g,m=>m[0]).replace(/[aeiouyh]/g,'').replace(/(.)\1+/g,'$1')}
 const gsWs=s=>gsT(s).split(' ').map(gsSk).join(' ');
@@ -3945,6 +3946,8 @@ const GSSUB=[
  {nm:'Match Special ID from Excel',in:'Special ID numbers',al:'special id excel match मैच',tab:'spid',act:()=>{}},
  {nm:'Merge sections of a class (e.g. class 8)',in:'Class & section',al:'merge section क्लास 8 सेक्शन मर्ज',tab:'clsec',act:()=>{}}
 ];
+function gsMatch(text,qv){const qt=gsT(qv),ws=qt.split(' ').filter(Boolean);if(!ws.length)return false;const hay=gsT(text),hk=gsWs(text);return ws.every(w=>hay.includes(w)||(gsSk(w).length>=2&&String(hk).split(' ').some(h=>h.startsWith(gsSk(w)))))}
+function gsSubGo(i){const x=GSSUB[+i];if(!x)return;gsClose();try{x.act()}catch(e){}if(S.tab===x.tab){renderAll(true)}else go(x.tab,gsGrpOf(x.tab))}
 function gsGrpOf(id){try{const g=navGroups().find(g=>g.leaves.some(l=>l.id===id));return g?g.k:''}catch(e){return''}}
 const GSALIAS={dacc:'data access एक्सेस अधिकार टीचर को डेटा भरने का अधिकार',resp:'responsibility ज़िम्मेदारी जिम्मेदारी क्लास टीचर बनाओ floor incharge',tsk:'task tasks काम टास्क',brs:'bulk route stop गाँव रूट स्टॉप एक साथ बदलो ट्रांसपोर्ट',gwk:'give work access काम अधिकार दो टीचर को ट्रांसपोर्ट परीक्षा फीस अकाउंट',vcl:'contact list village stop route गाँव स्टॉप रूट संपर्क सूची',rsl:'responsibility list ज़िम्मेदारी सूची किसके पास क्या चार्ज',xreg:'exam register परीक्षा रजिस्टर अंक',xwk:'extra work अतिरिक्त काम टीचर को काम दो पेंडिंग',crt:'child routes रूट बस route bus',prof:'my profile परिचय डायरी diary',natd:'native district नेटिव जिला',ldiag:'login diagnostic लॉगिन टीचर लॉगिन नहीं हो रहा',dent:'my data entry डेटा भरना',inbox:'requests अनुरोध मंज़ूरी approve',students:'students बच्चे विद्यार्थी',staff:'staff स्टाफ़ टीचर शिक्षक'};
 const GS={q:'',rec:null};
@@ -3987,7 +3990,7 @@ function gsDraw(){const R=$('#gs_r');if(!R)return;const q=GS.q,o=gsRun(q);const 
  const stf=o.staff.map(p=>`<div class="box row" style="margin:4px 0;gap:6px;flex-wrap:wrap"><div class="grow"><b>${esc(p.name)}</b><div class="small muted">${esc(catLabel(p.cat)||'')} ${esc(p.mobile)}</div></div><button class="btn sm sec" data-gs="${esc(p.id)}">Give work</button></div>`).join('');
  const sbs=(o.subs||[]).slice(0,8).map(i=>`<div class="box row" style="margin:4px 0;gap:8px"><div class="grow"><b>${esc(GSSUB[i].nm)}</b><div class="small muted">${esc(GSSUB[i].in)}</div></div><button class="btn sm" data-gsub="${i}">Open</button></div>`).join('');
  R.innerHTML=(sec('Options inside screens',sbs)+sec('Screens',tabs)+sec('Routes',rt)+sec('Villages',vil)+sec('Children ('+(o.kids.length+(o.more||0))+')',kids)+sec('Staff',stf))||'<p class="muted small">Nothing found. Try fewer letters, or another spelling.</p>';
- R.querySelectorAll('[data-gsub]').forEach(b=>b.onclick=()=>{const x=GSSUB[+b.dataset.gsub];gsClose();try{x.act()}catch(e){}if(S.tab===x.tab){renderAll(true)}else go(x.tab,gsGrpOf(x.tab))});
+ R.querySelectorAll('[data-gsub]').forEach(b=>b.onclick=()=>gsSubGo(b.dataset.gsub));
  R.querySelectorAll('[data-gt]').forEach(b=>b.onclick=()=>{const[i,g]=b.dataset.gt.split('|');gsClose();go(i,g)});
  R.querySelectorAll('[data-gv]').forEach(b=>b.onclick=()=>{$('#gs_q').value=b.dataset.gv;GS.q=b.dataset.gv;gsDraw()});
  R.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>openStudent(b.dataset.go));
@@ -8643,7 +8646,7 @@ ${FUP.f==='led'?`<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px;a
  $('#fu_x2').onclick=()=>{const R=fupEntries().sort((a,b)=>a.e.t-b.e.t).map(x=>[fupName(x.e.p),new Date(x.e.t).toLocaleDateString('en-GB'),x.s.name,x.s.cls,x.e.o,x.e.a,x.e.n,FUP_M[x.e.m]||x.e.m,x.e.w||'',x.e.r||'',x.e.b||'']);if(!R.length)return toast('No payment saved yet.',3000);exportTableDialog('Fee_payments',[['All fee updates',['Phase','Date','Child','Class','Old due','Paid','New due','Mode','Received by','Ref','Entered by'],R]])};
 }
 
-const APP_BUILD='due-v295';
+const APP_BUILD='due-v296';
 const AC={res:null,busy:false,errs:[]};
 const acColl=['settings','login','staff','classes','meta','thumbs','photos','rte','cinfo','suggest','flags','activity','contacts','priv','vreq','idreq','pwrm','hist','bin','bak','trash','atask','todo','cert','feerate','stock','recov','xcls','xph','secret','survey','sref','steam','admission','xreq','tmr'];
 const acFeat=[['Stock & orders','viewStock'],['Fee recovery (left students)','viewRecov'],['Extra classes','viewXcls'],['Check & correct (teachers)','viewCheck'],['Fee System link','viewFeeSys'],['✏ quick fix in lists','qfix'],['Certificates','viewCerts'],['Tasks','viewTasks'],['Contact list','viewClist'],['Due entries','viewDue'],['Counts & lists','viewCnts'],['Remove from portal','viewPw'],['Trash / Undo','delUndo'],['Survey','viewSurvey'],['Admissions','viewAdmn'],['Survey report','viewSvRep']];
